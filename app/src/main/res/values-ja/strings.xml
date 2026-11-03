@@ -574,6 +574,7 @@
     <string name="annotation_save_different_file_message">%1$s は現在読んでいるファイルではありません。この文書の内容で置き換えられ、元の内容は復元できなくなります。</string>
     <string name="annotation_save_overwrite_action">上書き</string>
     <string name="search_results">検索結果</string>
+    <string name="search_result_page_label">ページ\n%1$d</string>
     <string name="copy">コピー</string>
     <string name="copy_all">すべてコピー</string>
     <string name="highlight_update_failed">ハイライトを更新できませんでした</string>
@@ -646,8 +647,8 @@
     <string name="dracula">ドラキュラ</string>
     <string name="text_size">文字サイズ</string>
     <string name="go_to_page">ページを指定して移動</string>
-    <string name="no_input">入力してください</string>
     <string name="go_to">移動</string>
+    <string name="go_to_page_current_hint">現在のページ %1$d/%2$d</string>
     <string name="all_pages">すべてのページ</string>
     <string name="grid_columns">列数</string>
     <string name="page_thumbnail_description">ページのサムネイル</string>
@@ -753,7 +754,7 @@
     <string name="storage_permission_continue">続行</string>
     <string name="storage_permission_not_now">後で</string>
     <string name="storage_permission_grant">アクセスを許可</string>
-    <string name="home_recent_permission_message">本をもう一度開くには、ファイルへのアクセスを許可してください。</string>
+    <string name="home_recent_permission_message">ファイルへのアクセスがないため、最近使用した一部のドキュメントを確認できません。アクセスを許可すると、まだ利用可能なドキュメントをMJ PDFで確認して開けるようになります。</string>
     <string name="home_permission_card_message">ファイルへのアクセスを許可すると、この端末内のPDFからライブラリを作成できます。</string>
     <string name="home_scan_setup_message">ライブラリを作成するために、MJ PDFでPDFファイルを探す場所を選んでください。</string>
     <string name="home_scan_setup_button">PDFをスキャン</string>
@@ -764,6 +765,7 @@
     <string name="home_scan_locations_save">保存</string>
     <string name="home_scan_locations_up">上のフォルダーへ</string>
     <string name="home_menu_scan_locations">スキャンする場所</string>
+    <string name="home_menu_full_rescan">すべて再スキャン</string>
     <string name="home_search_hint">ライブラリを検索</string>
     <string name="home_tab_recent">最近</string>
     <string name="home_tab_library">ライブラリ</string>
@@ -785,7 +787,9 @@
     <string name="home_chip_abandoned">読むのをやめた</string>
     <string name="home_chip_all_files">すべてのファイル</string>
     <string name="home_hero_progress_template">%1$d%% · %2$d/%3$d</string>
-    <string name="home_scanning_progress">スキャン中… %1$d件のPDFが見つかりました</string>
+    <string name="home_scan_finding">PDFを検索中… %1$d件見つかりました</string>
+    <string name="home_scan_reading_details">PDFの詳細を読み込み中… %1$d/%2$d</string>
+    <string name="home_scan_incomplete">スキャン未完了… %1$d件のPDFが見つかりました</string>
     <string name="home_menu_title">ライブラリメニュー</string>
     <string name="home_menu_view">表示</string>
     <string name="home_menu_stats">ライブラリの統計</string>
