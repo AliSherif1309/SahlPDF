@@ -39,6 +39,10 @@
     {
       "file": "arabic-04-detached-marks.patch",
       "sha256": "e3a55cb5beabfbb2a8942a3ceadee8747f438595266e71e6abccbd7a970e4ae4"
+    },
+    {
+      "file": "annot-indirect.patch",
+      "sha256": "0b5f2b818eaa9cb8f83966f6bceac356db2c42c0fc4c7d665c6d5e79ae52053f"
     }
   ]
 }
