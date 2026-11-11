@@ -34,6 +34,7 @@ snapshot supplies every architecture in the invocation, so an edit to
 | --- | --- |
 | `standalone.patch` | Build one shared PDFium library, export its public interface, and retain Android symbol visibility. |
 | `arabic-*.patch` | Arabic geometry, replacement-text occurrence handling, logical units, conservative RTL reconstruction, combining-mark ownership, and regression tests. |
+| `annot-indirect.patch` | Write annotations as indirect objects so `/Annots` contains only references. |
 
 The shared-library patch replaces the previous build/header/toolchain patch
 collection. At this revision, the tested standalone build needs only changes in
