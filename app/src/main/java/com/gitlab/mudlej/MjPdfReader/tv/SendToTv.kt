@@ -147,7 +147,7 @@ var s=await one(fs[i],c,li);if(s==403)break}}
 /** The TV window that shows the address and code, and lists what arrived. */
 object SendToTvDialog {
     fun show(a: Activity, onReceived: (File) -> Unit) {
-        val ar = a.resources.configuration.locales[0].language == "ar"
+        val ar = java.util.Locale.getDefault().language == "ar"
         fun t(en: String, x: String) = if (ar) x else en
         val pad = (20 * a.resources.displayMetrics.density).toInt()
         val msg = TextView(a).apply { textSize = 18f; setPadding(pad, pad, pad, pad / 2) }
