@@ -5,5 +5,10 @@
         android:color="?attr/colorPrimary"
         android:alpha="0.22"
         android:state_checked="true" />
+    <!-- Sahl PDF: the book selected with the TV remote glows gold -->
+    <item
+        android:color="#E0B85C"
+        android:alpha="0.38"
+        android:state_focused="true" />
     <item android:color="@android:color/transparent" />
 </selector>

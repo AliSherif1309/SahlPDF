@@ -21,7 +21,7 @@
         app:cardForegroundColor="@color/home_card_checked_foreground"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
-        app:strokeColor="?attr/colorOutlineVariant"
+        app:strokeColor="@color/tv_card_stroke"
         app:strokeWidth="1dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout

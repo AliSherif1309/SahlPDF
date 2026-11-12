@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sahl PDF: gold outline on the card selected with the TV remote. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="#E0B85C" android:state_focused="true" />
+    <item android:color="?attr/colorOutlineVariant" />
+</selector>

@@ -5,6 +5,9 @@ Changes for TV (see `app/src/main/java/com/gitlab/mudlej/MjPdfReader/tv/`):
 
 - **Send from phone**: the TV shows an address and a 6-digit code; open it on your phone (same Wi-Fi), pick one or more PDFs and press Send. Each book is saved once in `Download/Sahl PDF` and appears in the Library.
 - **Remote control** in the reader: ◀ ▶ turn pages (follows right-to-left books), ▲ ▼ move inside the page, OK shows / hides the toolbars, ⏩ ⏪ and channel +/− turn pages too.
+- **TV menu** (OK while reading, or the Menu key): table of contents, go to page, bookmarks, search, one / two pages, dark page, zoom in / out / fit, hide margins, reading direction, text mode, back to previous place, toolbars, settings. Touch-only tools are left out.
+- **TV defaults** (first start on a TV): two pages side by side, whole page visible, page-by-page, no toolbars until asked.
+- Back with the toolbars open returns to the page; the selected book in the library glows gold.
 - TV home-screen entry and banner; own app id (`com.aly.sahlpdf`) so it installs next to MJ PDF.
 - Crash reports to the original author's server are turned off.
 

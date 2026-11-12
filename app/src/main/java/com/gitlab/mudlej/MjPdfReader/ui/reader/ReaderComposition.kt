@@ -728,6 +728,9 @@ class ReaderComposition(
         }
     }
 
+    /** Sahl PDF: the same actions the toolbar uses, for the TV menu. */
+    fun tvHandlers(): ConfigurableActionResolver.Handlers = createHandlers()
+
     private fun createHandlers(): ConfigurableActionResolver.Handlers {
         return ConfigurableActionResolver.Handlers(
             toggleFullscreen = { fullscreenController.toggleFullscreen() },

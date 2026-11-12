@@ -29,6 +29,7 @@ class App : Application() {
             return
         }
         DynamicColors.applyToActivitiesIfAvailable(this)
+        com.gitlab.mudlej.MjPdfReader.tv.TvDefaults.apply(this)
         if (!ACRA.isACRASenderServiceProcess()) {
             installDebugThreadPolicy()
             val preferences = Preferences(PreferenceManager.getDefaultSharedPreferences(this))

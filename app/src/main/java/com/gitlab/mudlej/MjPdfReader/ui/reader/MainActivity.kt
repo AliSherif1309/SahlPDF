@@ -80,8 +80,10 @@ class MainActivity : AppCompatActivity(), ReaderUi {
     /** Sahl PDF: TV remote control (pages, scrolling, toolbars). */
     private val tvRemote by lazy {
         com.gitlab.mudlej.MjPdfReader.tv.TvRemote(this, binding.pdfView, { binding.pdfView.getCurrentPage() }) {
-            reader.fullscreenController.toggleFullscreen()
-            if (isTv()) binding.pdfView.requestFocus()
+            // OK on the page: the TV menu (table of contents, bookmarks, search, zoom, two pages…)
+            com.gitlab.mudlej.MjPdfReader.tv.TvMenu.show(this, binding.pdfView, reader.tvHandlers(), pref.getDualPageMode(), !vm.isFullScreenToggled) {
+                binding.pdfView.requestFocus()
+            }
         }
     }
 
@@ -900,6 +902,16 @@ class MainActivity : AppCompatActivity(), ReaderUi {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (::reader.isInitialized && isTv() && tvRemote.handleKeyDown(keyCode)) {
+            return true
+        }
+        if (::reader.isInitialized && isTv() && keyCode == KeyEvent.KEYCODE_BACK && !vm.isFullScreenToggled) {
+            // Back with the toolbars open: close them and return to the page (instead of leaving the book)
+            fullscreenController.toggleFullscreen()
+            binding.pdfView.requestFocus()
+            return true
+        }
+        if (::reader.isInitialized && isTv() && keyCode == KeyEvent.KEYCODE_MENU) {
+            tvRemote.handleKeyDown(KeyEvent.KEYCODE_DPAD_CENTER)
             return true
         }
         if (reader.volumeKeyPager.handleKeyDown(keyCode)) {
