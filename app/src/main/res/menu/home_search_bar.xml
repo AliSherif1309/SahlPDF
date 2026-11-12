@@ -4,6 +4,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/sendToTvOption"
+        android:icon="@drawable/ic_send_to_tv"
+        android:title="@string/send_to_tv"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/homeMenuOption"
         android:icon="@drawable/ic_more_vert"
         android:title="@string/home_menu_title"

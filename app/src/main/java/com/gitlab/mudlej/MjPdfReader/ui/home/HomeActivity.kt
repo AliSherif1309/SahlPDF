@@ -2,6 +2,9 @@
 
 package com.gitlab.mudlej.MjPdfReader.ui.home
 
+import com.gitlab.mudlej.MjPdfReader.tv.tvLibraryDir
+import com.gitlab.mudlej.MjPdfReader.tv.isTv
+import com.gitlab.mudlej.MjPdfReader.tv.SendToTvDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -380,6 +383,9 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             if (menuItem.itemId == R.id.homeMenuOption) {
                 menuDialog.show()
                 true
+            } else if (menuItem.itemId == R.id.sendToTvOption) {
+                showSendToTv()
+                true
             } else {
                 false
             }
@@ -387,7 +393,10 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     }
 
     private fun setupOpenFab() {
-        binding.openPdfFab.setOnClickListener { pdfPicker.launch(arrayOf(PDF.FILE_TYPE)) }
+        binding.openPdfFab.setOnClickListener {
+            // a TV has no file picker: books come from the phone instead
+            if (isTv()) showSendToTv() else pdfPicker.launch(arrayOf(PDF.FILE_TYPE))
+        }
         binding.openPdfFab.setOnLongClickListener {
             toast(this, R.string.open_in_incognito_hint, Toast.LENGTH_SHORT)
             pdfPickerIncognito.launch(arrayOf(PDF.FILE_TYPE))
@@ -586,6 +595,27 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
             refreshJobs.add(job)
             job.invokeOnCompletion { refreshJobs.remove(job) }
         }
+    }
+
+    /** Sahl PDF: receive PDFs from the phone; they are saved once into the TV library folder and scanned. */
+    private fun showSendToTv() {
+        val dir = tvLibraryDir()
+        makeScannable(dir)
+        SendToTvDialog.show(this) {
+            rendering.invalidateAvailability()
+            libraryScanner.refresh(ScanRefreshReason.MANUAL)
+        }
+    }
+
+    private fun makeScannable(dir: java.io.File) {
+        val mode = pref.getScanMode()
+        if (mode == ScanMode.WHOLE_DEVICE) return
+        val locations = pref.getScanLocations()
+        if (ScanScope.contains(ScanScope.displayRoots(mode, locations), dir.absolutePath) && mode != ScanMode.NOT_CONFIGURED) return
+        val previous = ScanScope.displayRoots(mode, locations)
+        pref.setScanLocations(locations + dir.absolutePath)
+        pref.setScanMode(ScanMode.SELECTED_LOCATIONS)
+        libraryScanner.onScopeChanged(previous)
     }
 
     private fun openInReader(uri: Uri, hash: String? = null, incognito: Boolean = false) {

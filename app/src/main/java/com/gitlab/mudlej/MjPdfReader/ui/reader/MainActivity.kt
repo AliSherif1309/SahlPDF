@@ -2,6 +2,7 @@
 
 package com.gitlab.mudlej.MjPdfReader.ui.reader
 
+import com.gitlab.mudlej.MjPdfReader.tv.isTv
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ActivityManager
@@ -76,6 +77,13 @@ class MainActivity : AppCompatActivity(), ReaderUi {
     private lateinit var binding: ActivityMainBinding
     private lateinit var pref: Preferences
     private lateinit var reader: ReaderComposition
+    /** Sahl PDF: TV remote control (pages, scrolling, toolbars). */
+    private val tvRemote by lazy {
+        com.gitlab.mudlej.MjPdfReader.tv.TvRemote(this, binding.pdfView, { binding.pdfView.getCurrentPage() }) {
+            reader.fullscreenController.toggleFullscreen()
+            if (isTv()) binding.pdfView.requestFocus()
+        }
+    }
 
     private val vm: ReaderViewModel by viewModels()
     private val pdf: DocumentState get() = vm.doc
@@ -529,6 +537,12 @@ class MainActivity : AppCompatActivity(), ReaderUi {
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
+        if (hasFocus && isTv() && ::binding.isInitialized && currentFocus == null) {
+            // on a TV the remote needs something focused: give it to the page
+            binding.pdfView.isFocusable = true
+            binding.pdfView.isFocusableInTouchMode = true
+            binding.pdfView.requestFocus()
+        }
         super.onWindowFocusChanged(hasFocus)
         fullscreenController.refreshOnWindowFocus(hasFocus)
     }
@@ -885,6 +899,9 @@ class MainActivity : AppCompatActivity(), ReaderUi {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (::reader.isInitialized && isTv() && tvRemote.handleKeyDown(keyCode)) {
+            return true
+        }
         if (reader.volumeKeyPager.handleKeyDown(keyCode)) {
             return true
         }

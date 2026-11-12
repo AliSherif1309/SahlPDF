@@ -48,12 +48,12 @@ android {
     def fdroidAbi = project.findProperty("fdroidAbi")
 
     defaultConfig {
-        applicationId "com.gitlab.mudlej.MjPdfReader"
+        applicationId "com.aly.sahlpdf"   // Sahl PDF: own id, installs next to MJ PDF
         minSdkVersion 23
         compileSdkVersion 36
         targetSdkVersion 36
-        versionCode 58
-        versionName "3.1.0"
+        versionCode 1000 + (System.getenv("GITHUB_RUN_NUMBER")?.toInteger() ?: 0)
+        versionName "1.0 (MJ PDF 3.1.0)"
         multiDexEnabled = true
         vectorDrawables.useSupportLibrary = true
 
@@ -113,8 +113,22 @@ android {
         includeInBundle = false
     }
 
+    signingConfigs {
+        // Sahl PDF: signed with the same key as Sahl TV / Sahl Quran (from GitHub secrets in CI)
+        sahl {
+            def ks = System.getenv("SIGNING_KEYSTORE_PATH")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (System.getenv("SIGNING_KEYSTORE_PATH")) signingConfig signingConfigs.sahl
             debuggable false
             minifyEnabled true
             shrinkResources = true

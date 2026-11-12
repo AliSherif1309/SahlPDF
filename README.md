@@ -1,3 +1,20 @@
+# Sahl PDF — MJ PDF for Android TV
+
+Sahl PDF is a TV edition of [MJ PDF](https://gitlab.com/mudlej_android/mj_pdf_reader) by Mudlej, under the same GPLv3 licence.
+Changes for TV (see `app/src/main/java/com/gitlab/mudlej/MjPdfReader/tv/`):
+
+- **Send from phone**: the TV shows an address and a 6-digit code; open it on your phone (same Wi-Fi), pick one or more PDFs and press Send. Each book is saved once in `Download/Sahl PDF` and appears in the Library.
+- **Remote control** in the reader: ◀ ▶ turn pages (follows right-to-left books), ▲ ▼ move inside the page, OK shows / hides the toolbars, ⏩ ⏪ and channel +/− turn pages too.
+- TV home-screen entry and banner; own app id (`com.aly.sahlpdf`) so it installs next to MJ PDF.
+- Crash reports to the original author's server are turned off.
+
+One-time setup on the TV (so the library can see your books):
+```
+adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
+```
+
+---
+
 <div align="center">
 
 <img src="assets/logo/logo.webp" width="110" alt="MJ PDF logo"/>

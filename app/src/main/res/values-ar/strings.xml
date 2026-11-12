@@ -979,4 +979,5 @@
         <item quantity="many">%d ثانية</item>
         <item quantity="other">%d ثانية</item>
     </plurals>
+    <string name="send_to_tv">إرسال من الهاتف</string>
 </resources>

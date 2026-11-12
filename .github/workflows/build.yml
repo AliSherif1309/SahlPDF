@@ -2,6 +2,8 @@ name: Build Sahl PDF
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,17 +19,44 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          echo "NDK: $ANDROID_NDK_LATEST_HOME"
       - name: Native libraries (PDFium prebuilt for now, then the JNI bridge)
         run: |
           pip install requests
           ANDROID_NDK="$ANDROID_NDK_LATEST_HOME" python3 build_dependencies.py --pdfium prebuilt --abi all
-      - name: Build debug APK
+      - name: Build (signed release with the Sahl key when the secrets are set, otherwise a test build)
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace
-          ls -la app/build/outputs/apk/debug/
+          mkdir -p out
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export SIGNING_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+            ./gradlew :app:assembleRelease --no-daemon
+            rm -f "$RUNNER_TEMP/release.jks"
+            ls -la app/build/outputs/apk/release/
+            cp app/build/outputs/apk/release/*universal*.apk out/SahlPDF.apk
+            cp app/build/outputs/apk/release/*armeabi-v7a*.apk out/SahlPDF-armeabi-v7a.apk || true
+            cp app/build/outputs/apk/release/*arm64-v8a*.apk out/SahlPDF-arm64-v8a.apk || true
+            echo "SIGNED=1" >> $GITHUB_ENV
+          else
+            echo "::warning::Signing secrets are not set in this repository yet: building a TEST version (debug key). Add the 4 SIGNING_* secrets to get the real release."
+            ./gradlew :app:assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/*.apk out/SahlPDF-test.apk
+          fi
+          ls -la out
       - uses: actions/upload-artifact@v4
         with:
-          name: SahlPDF-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: SahlPDF
+          path: out/*.apk
+      - name: Publish as the "latest" release
+        if: env.SIGNED == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest out/*.apk --title "Sahl PDF (latest build)" \
+            --notes "Build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA::7}). For the Mi TV use SahlPDF-armeabi-v7a.apk (smaller) or SahlPDF.apk (works everywhere). Based on MJ PDF by Mudlej (GPLv3)."
