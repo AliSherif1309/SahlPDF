@@ -57,6 +57,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # version.json: what Sahl TV reads for "Check for updates"
+          python3 -c "import json,os,subprocess; json.dump({'code': 1000+int(os.environ['GITHUB_RUN_NUMBER']), 'sahlpdf': '1.0', 'notes': subprocess.run(['git','log','-1','--format=%s'],capture_output=True,text=True).stdout.strip()}, open('out/version.json','w'))"
+          cat out/version.json
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest out/*.apk --title "Sahl PDF (latest build)" \
+          gh release create latest out/*.apk out/version.json --title "Sahl PDF (latest build)" \
             --notes "Build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA::7}). For the Mi TV use SahlPDF-armeabi-v7a.apk (smaller) or SahlPDF.apk (works everywhere). Based on MJ PDF by Mudlej (GPLv3)."
