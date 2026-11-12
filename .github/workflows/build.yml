@@ -1,0 +1,33 @@
+name: Build Sahl PDF
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Android SDK pieces
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "NDK: $ANDROID_NDK_LATEST_HOME"
+      - name: Native libraries (PDFium prebuilt for now, then the JNI bridge)
+        run: |
+          pip install requests
+          ANDROID_NDK="$ANDROID_NDK_LATEST_HOME" python3 build_dependencies.py --pdfium prebuilt --abi all
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          ls -la app/build/outputs/apk/debug/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SahlPDF-debug
+          path: app/build/outputs/apk/debug/*.apk
