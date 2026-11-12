@@ -9,6 +9,10 @@ import androidx.preference.PreferenceManager
 import com.github.barteksc.pdfviewer.PDFView
 import com.gitlab.mudlej.MjPdfReader.data.PageFitPolicy
 import com.gitlab.mudlej.MjPdfReader.data.Preferences
+import com.gitlab.mudlej.MjPdfReader.ui.home.HomeGridSize
+import com.gitlab.mudlej.MjPdfReader.ui.home.HomeSortOrder
+import com.gitlab.mudlej.MjPdfReader.ui.home.HomeTab
+import com.gitlab.mudlej.MjPdfReader.ui.home.HomeViewMode
 import com.gitlab.mudlej.MjPdfReader.ui.reader.actions.ConfigurableActionResolver
 import java.util.Locale
 
@@ -21,6 +25,7 @@ object TvDefaults {
 
     fun apply(ctx: Context) {
         if (!ctx.isTv()) return
+        applyLibrary(ctx)
         val sp = PreferenceManager.getDefaultSharedPreferences(ctx)
         if (sp.getBoolean(KEY, false)) return
         val pref = Preferences(sp)
@@ -30,6 +35,21 @@ object TvDefaults {
         pref.setAutoFullScreen(true)
         pref.setShowExitFullscreenTip(false)
         sp.edit().putBoolean(KEY, true).apply()
+    }
+
+    /** Library on the TV: open on Recent (it starts with "Continue Reading"), big covers in a grid, newest first. */
+    private const val KEY2 = "sahlTvDefaultsV2"
+
+    fun applyLibrary(ctx: Context) {
+        if (!ctx.isTv()) return
+        val sp = PreferenceManager.getDefaultSharedPreferences(ctx)
+        if (sp.getBoolean(KEY2, false)) return
+        val pref = Preferences(sp)
+        pref.setHomeTab(HomeTab.RECENT)
+        pref.setHomeViewMode(HomeViewMode.GRID)
+        pref.setHomeGridSize(HomeGridSize.LARGE)
+        pref.setHomeSort(HomeSortOrder.LAST_OPENED)
+        sp.edit().putBoolean(KEY2, true).apply()
     }
 }
 

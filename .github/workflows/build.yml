@@ -7,7 +7,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -19,10 +19,48 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-      - name: Native libraries (PDFium prebuilt for now, then the JNI bridge)
+      - name: Native libraries cache (PDFium built from source with the Arabic fixes)
+        id: native
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            PdfiumAndroid/src/main/jni/lib
+            PdfiumAndroid/src/main/libs
+          key: native-src-v1-${{ hashFiles('build_dependencies/**', 'build_dependencies.py', 'PdfiumAndroid/src/main/jni/**/*.c*', 'PdfiumAndroid/src/main/jni/**/*.h', 'PdfiumAndroid/src/main/jni/**/*.mk', 'PdfiumAndroid/src/main/jni/**/CMakeLists.txt') }}
+      - name: Make room on the disk (the PDFium source is big)
+        if: steps.native.outputs.cache-hit != 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/node_modules /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true
+          df -h .
+      - name: Build PDFium from source (MJ PDF's patched engine, first time only)
+        id: fromsource
+        if: steps.native.outputs.cache-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 240
         run: |
           pip install requests
+          ANDROID_NDK="$ANDROID_NDK_LATEST_HOME" python3 build_dependencies.py --abi all
+          echo "ENGINE=source" >> $GITHUB_ENV
+      - name: Save the engine for the next builds
+        if: steps.native.outputs.cache-hit != 'true' && steps.fromsource.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            PdfiumAndroid/src/main/jni/lib
+            PdfiumAndroid/src/main/libs
+          key: ${{ steps.native.outputs.cache-primary-key }}
+      - name: Fallback - ready-made PDFium (without the Arabic fixes)
+        if: steps.native.outputs.cache-hit != 'true' && steps.fromsource.outcome != 'success'
+        run: |
+          echo "::warning::PDFium source build failed, using the prebuilt engine for this build."
+          pip install requests
+          rm -rf PdfiumAndroid/src/main/jni/lib PdfiumAndroid/src/main/libs
           ANDROID_NDK="$ANDROID_NDK_LATEST_HOME" python3 build_dependencies.py --pdfium prebuilt --abi all
+          echo "ENGINE=prebuilt" >> $GITHUB_ENV
+      - name: Engine in use
+        run: |
+          [ "${{ steps.native.outputs.cache-hit }}" = "true" ] && echo "ENGINE=source" >> $GITHUB_ENV || true
+          find PdfiumAndroid/src/main -name "*.so" | sort
       - name: Build (signed release with the Sahl key when the secrets are set, otherwise a test build)
         env:
           KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
@@ -58,8 +96,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # version.json: what Sahl TV reads for "Check for updates"
-          python3 -c "import json,os,subprocess; json.dump({'code': 1000+int(os.environ['GITHUB_RUN_NUMBER']), 'sahlpdf': '1.1', 'notes': subprocess.run(['git','log','-1','--format=%s'],capture_output=True,text=True).stdout.strip()}, open('out/version.json','w'))"
+          python3 -c "import json,os,subprocess; json.dump({'code': 1000+int(os.environ['GITHUB_RUN_NUMBER']), 'sahlpdf': '1.2', 'engine': os.environ.get('ENGINE',''), 'notes': subprocess.run(['git','log','-1','--format=%s'],capture_output=True,text=True).stdout.strip()}, open('out/version.json','w'))"
           cat out/version.json
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest out/*.apk out/version.json --title "Sahl PDF (latest build)" \
-            --notes "Build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA::7}). For the Mi TV use SahlPDF-armeabi-v7a.apk (smaller) or SahlPDF.apk (works everywhere). Based on MJ PDF by Mudlej (GPLv3)."
+            --notes "Build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA::7}). For the Mi TV use SahlPDF-armeabi-v7a.apk (smaller) or SahlPDF.apk (works everywhere). PDF engine: ${ENGINE}. Based on MJ PDF by Mudlej (GPLv3)."
