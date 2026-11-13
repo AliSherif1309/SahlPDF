@@ -50,7 +50,7 @@ fun showBackupExportOptionsDialog(
     container.addView(historyRow)
     container.addView(passwordsRow)
 
-    val dialog = MaterialAlertDialogBuilder(context)
+    val dialog = com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(R.string.backup_export_title)
         .setView(container)
         .setPositiveButton(R.string.backup_export_action) { _, _ ->

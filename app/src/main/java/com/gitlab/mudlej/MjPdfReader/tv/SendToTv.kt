@@ -169,7 +169,7 @@ object SendToTvDialog {
         }
         refresh()
         server.start()
-        AlertDialog.Builder(a)
+        com.aly.typography.ArabicCompatDialogBuilder(a)
             .setTitle(t("Send PDFs from your phone", "أرسل ملفات PDF من الهاتف"))
             .setView(msg)
             .setPositiveButton(t("Done", "تم"), null)

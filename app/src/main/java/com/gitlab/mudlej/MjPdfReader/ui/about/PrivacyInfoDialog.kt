@@ -11,7 +11,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 class PrivacyInfoDialog : DialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        return MaterialAlertDialogBuilder(requireContext())
+        return com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
             .setTitle(R.string.privacy)
             .setMessage(R.string.privacy_info)
             .setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss() }

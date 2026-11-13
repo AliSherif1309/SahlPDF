@@ -37,7 +37,7 @@ class SignatureController(
         val sheetBinding = DialogSignatureBinding.inflate(LayoutInflater.from(activity))
         store.load()?.let { sheetBinding.signatureView.setSignature(it) }
         configureColorSwatches(sheetBinding)
-        val dialog = MaterialAlertDialogBuilder(activity)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.signature_dialog_title)
             .setView(sheetBinding.root)
             .setPositiveButton(R.string.signature_place, null)

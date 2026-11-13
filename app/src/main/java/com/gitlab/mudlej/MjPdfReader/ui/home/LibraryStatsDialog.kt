@@ -85,7 +85,7 @@ fun showLibraryStatsDialog(
     addRow(R.string.home_chip_abandoned, formatCount(statusCount(ReadingStatus.ABANDONED)))
     addRow(R.string.home_stats_no_status, formatCount(statusCount(ReadingStatus.UNSET)))
 
-    MaterialAlertDialogBuilder(activity)
+    com.aly.typography.ArabicMaterialDialogBuilder(activity)
         .setTitle(R.string.home_menu_stats)
         .setView(ScrollView(activity).apply { addView(content) })
         .setPositiveButton(R.string.ok, null)

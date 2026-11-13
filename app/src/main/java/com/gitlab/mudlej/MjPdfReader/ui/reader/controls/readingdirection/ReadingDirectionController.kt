@@ -30,7 +30,7 @@ class ReadingDirectionController(
 
     fun showDialog() {
         var selectedOverride = pdf.readingDirectionOverride
-        val dialogBuilder = MaterialAlertDialogBuilder(activity)
+        val dialogBuilder = com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.reading_direction)
             .setSingleChoiceItems(
                 dialogItems(),

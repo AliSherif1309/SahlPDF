@@ -303,7 +303,7 @@ class InlineAnnotationActionController(
             setPadding((24 * density).toInt(), (8 * density).toInt(), (24 * density).toInt(), 0)
             addView(editText)
         }
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.note)
             .setView(container)
             .setPositiveButton(R.string.save) { _, _ ->
@@ -319,7 +319,7 @@ class InlineAnnotationActionController(
     }
 
     private fun showNoteViewDialog(annotation: PDFView.HighlightAnnotation) {
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.note)
             .setMessage(annotation.note)
             .setPositiveButton(R.string.edit) { _, _ -> showNoteEditorDialog(annotation) }
@@ -516,7 +516,7 @@ class InlineAnnotationActionController(
     }
 
     private fun showNoTranslationAppDialog() {
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.no_translate_app_found)
             .setMessage(R.string.no_translate_app_message)
             .setPositiveButton(R.string.settings) { _, _ -> onOpenSettings() }

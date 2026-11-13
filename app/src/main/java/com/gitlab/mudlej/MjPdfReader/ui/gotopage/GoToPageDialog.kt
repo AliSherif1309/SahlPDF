@@ -38,7 +38,7 @@ fun showGoToPageDialog(
         null
     }
 
-    val builder = MaterialAlertDialogBuilder(activity)
+    val builder = com.aly.typography.ArabicMaterialDialogBuilder(activity)
         .setTitle(activity.getString(R.string.go_to_page))
         .setView(binding.root)
         .setPositiveButton(activity.getString(R.string.go_to), null)

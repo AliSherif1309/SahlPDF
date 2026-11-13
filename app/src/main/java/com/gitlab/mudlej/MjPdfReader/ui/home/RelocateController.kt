@@ -67,7 +67,7 @@ class RelocateController(
     }
 
     private fun showRelocateDialog(record: PdfRecord) {
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.home_relocate_title)
             .setMessage(activity.getString(R.string.home_relocate_message, record.fileName))
             .setPositiveButton(R.string.home_relocate_action) { _, _ ->
@@ -98,7 +98,7 @@ class RelocateController(
     }
 
     private fun showMismatchDialog(uri: Uri) {
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.home_relocate_mismatch_title)
             .setMessage(R.string.home_relocate_mismatch_message)
             .setPositiveButton(R.string.home_open_anyway) { _, _ ->

@@ -30,7 +30,7 @@ class HomeMenuDialog(
 
     fun show() {
         val binding = DialogHomeMenuBinding.inflate(activity.layoutInflater)
-        val dialog = MaterialAlertDialogBuilder(activity)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setView(binding.root)
             .create()
 

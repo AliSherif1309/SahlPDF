@@ -53,7 +53,7 @@ fun showMetaDialog(
         return
     }
     try {
-        MaterialAlertDialogBuilder(context)
+        com.aly.typography.ArabicMaterialDialogBuilder(context)
             .setTitle(R.string.file_properties)
             .setView(createMetadataView(context, meta, fileName, fileSizeBytes, pageSize, fonts, filePath))
             .setPositiveButton(android.R.string.ok, null)
@@ -126,7 +126,7 @@ private fun dp(context: Context, value: Int): Int {
 }
 
 fun showHowToExitFullscreenDialog(context: Context, pref: Preferences) {
-    MaterialAlertDialogBuilder(context)
+    com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(context.getString(R.string.exit_fullscreen_title))
         .setMessage(context.getString(R.string.exit_fullscreen_message))
         .setPositiveButton(context.getString(R.string.exit_fullscreen_positive)) { _, _ ->
@@ -145,7 +145,7 @@ fun showAskForPasswordDialog(
     dialogBinding: PasswordDialogBinding,
     displayFunc: (Uri?, Boolean) -> Unit
 ) {
-    val alert = MaterialAlertDialogBuilder(context)
+    val alert = com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(R.string.protected_pdf)
         .setView(dialogBinding.root)
         .setIcon(R.drawable.lock_icon)
@@ -175,7 +175,7 @@ fun showCopyPageTextDialog(
     val scrollView = ScrollView(activity)
     scrollView.addView(pageTextView)
 
-    MaterialAlertDialogBuilder(activity)
+    com.aly.typography.ArabicMaterialDialogBuilder(activity)
         .setView(scrollView)
         .setTitle("${activity.getString(R.string.selectable_text)} #${pageNumber + 1}")
         .setNegativeButton(activity.getString(R.string.close)) { dialog, _ -> dialog.dismiss() }
@@ -208,7 +208,7 @@ fun showSearchDialog(activity: Activity, pdf: DocumentState, onQueryConfirmed: (
         addView(searchLayout)
         addView(ignoreAccentsCheckBox, checkBoxParams)
     }
-    MaterialAlertDialogBuilder(activity)
+    com.aly.typography.ArabicMaterialDialogBuilder(activity)
         .setTitle(activity.getString(R.string.search))
         .setMessage(activity.getString(R.string.search_dialog_message))
         .setView(dialogContent)
@@ -220,7 +220,7 @@ fun showSearchDialog(activity: Activity, pdf: DocumentState, onQueryConfirmed: (
                 onQueryConfirmed(queryText, ignoreAccentsCheckBox.isChecked)
             }
             if (queryText.isBlank() || queryText.length < PDF.MIN_SEARCH_QUERY) {
-                MaterialAlertDialogBuilder(activity)
+                com.aly.typography.ArabicMaterialDialogBuilder(activity)
                     .setTitle(activity.getString(R.string.too_short_query))
                     .setMessage(activity.getString(R.string.too_short_query_message).format(queryText))
                     .setNeutralButton(activity.getString(R.string.proceed_anyway)) { _, _ ->

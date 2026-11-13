@@ -144,7 +144,7 @@ class AnnotationSaveController(
         if (routing == SaveRouting.SameFileDialog) {
             vm.pendingPostSaveAction = null
             vm.pendingPostSaveActionUri = null
-            MaterialAlertDialogBuilder(activity)
+            com.aly.typography.ArabicMaterialDialogBuilder(activity)
                 .setTitle(R.string.annotation_save_same_file_title)
                 .setMessage(R.string.annotation_save_same_file_message)
                 .setPositiveButton(R.string.annotation_save_copy_action) { _, _ -> launchCreateDestinationPicker() }
@@ -166,7 +166,7 @@ class AnnotationSaveController(
         val postSaveActionUri = vm.pendingPostSaveActionUri
         vm.pendingPostSaveAction = null
         vm.pendingPostSaveActionUri = null
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.annotation_save_different_file_title)
             .setMessage(activity.getString(R.string.annotation_save_different_file_message, destinationName))
             .setPositiveButton(R.string.annotation_save_overwrite_action) { _, _ ->
@@ -227,7 +227,7 @@ class AnnotationSaveController(
             activity.getString(R.string.update_existing_file),
             activity.getString(R.string.save_as_new_copy),
         )
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.save_highlights)
             .setItems(options) { _, which ->
                 if (which == 0) {
@@ -572,7 +572,7 @@ class AnnotationSaveController(
                 message = activity.getString(R.string.annotation_save_failed_message)
             }
         }
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(titleRes)
             .setMessage(message)
             .setPositiveButton(R.string.annotation_save_copy_action) { _, _ -> launchCreateDestinationPicker() }

@@ -80,7 +80,7 @@ fun showShareQuoteDialog(
     binding.reflowSwitch.setOnCheckedChangeListener { _, _ -> refreshPreview() }
     refreshPreview()
 
-    MaterialAlertDialogBuilder(activity, R.style.CompactMaterialAlertDialog)
+    com.aly.typography.ArabicMaterialDialogBuilder(activity, R.style.CompactMaterialAlertDialog)
         .setTitle(R.string.share_quote)
         .setView(binding.root)
         .setPositiveButton(R.string.share) { _, _ ->

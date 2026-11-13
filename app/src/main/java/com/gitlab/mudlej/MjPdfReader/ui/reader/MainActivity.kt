@@ -331,7 +331,7 @@ class MainActivity : AppCompatActivity(), ReaderUi {
             performPostSaveAction(action, uri)
             return
         }
-        MaterialAlertDialogBuilder(this)
+        com.aly.typography.ArabicMaterialDialogBuilder(this)
             .setTitle(R.string.unsaved_highlights)
             .setMessage(R.string.unsaved_highlights_prompt)
             .setPositiveButton(R.string.save_highlights) { _, _ ->
@@ -350,7 +350,7 @@ class MainActivity : AppCompatActivity(), ReaderUi {
             performPostSaveAction(action, uri)
             return
         }
-        MaterialAlertDialogBuilder(this)
+        com.aly.typography.ArabicMaterialDialogBuilder(this)
             .setTitle(R.string.unsaved_highlights)
             .setMessage(R.string.unsaved_highlights_prompt)
             .setPositiveButton(R.string.save_highlights) { _, _ ->
@@ -456,7 +456,7 @@ class MainActivity : AppCompatActivity(), ReaderUi {
     }
 
     private fun promptRestoreAnnotations(documentUri: Uri, loadToken: Long) {
-        MaterialAlertDialogBuilder(this)
+        com.aly.typography.ArabicMaterialDialogBuilder(this)
             .setTitle(R.string.restore_unsaved_highlights_title)
             .setMessage(R.string.restore_unsaved_highlights_message)
             .setCancelable(false)
@@ -617,7 +617,7 @@ class MainActivity : AppCompatActivity(), ReaderUi {
     private fun showBackupNoticesIfNeeded() {
         pref.getImportResultPending()?.let { message ->
             pref.setImportResultPending(null)
-            MaterialAlertDialogBuilder(this)
+            com.aly.typography.ArabicMaterialDialogBuilder(this)
                 .setTitle(R.string.backup_import_title)
                 .setMessage(message)
                 .setPositiveButton(R.string.ok, null)
@@ -687,7 +687,7 @@ class MainActivity : AppCompatActivity(), ReaderUi {
             getString(R.string.share_link_option),
             getString(R.string.share_pdf_option),
         )
-        MaterialAlertDialogBuilder(this)
+        com.aly.typography.ArabicMaterialDialogBuilder(this)
             .setTitle(R.string.share_file)
             .setItems(options) { _, which ->
                 if (which == 0) {

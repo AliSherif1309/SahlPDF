@@ -42,7 +42,7 @@ class FormFieldController(
 
     private fun showTextFieldDialog(field: PDFView.FormField) {
         val input = createFieldInput(field)
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(fieldTitle(field))
             .setView(createDialogContainer(input))
             .setPositiveButton(R.string.ok) { _, _ -> applyText(field, input.text.toString()) }
