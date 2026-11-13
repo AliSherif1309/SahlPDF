@@ -274,7 +274,7 @@ def prepareThmanyah = tasks.register('prepareThmanyah', Exec) {
     inputs.file(rootProject.file('tools/prepare_thmanyah.py'))
     outputs.files(['r', 'm', 'b'].collect { new File(thmanyahAssets.get().asFile, 'thmanyah/' + it + '.bin') })
 }
-android.sourceSets.main.assets.srcDir(thmanyahAssets)
+android.sourceSets.main.assets.srcDir(thmanyahAssets.get().asFile)
 tasks.matching { it.name == 'preBuild' || it.name ==~ /merge.*Assets/ }.configureEach {
     dependsOn(prepareThmanyah)
 }
