@@ -22,7 +22,7 @@ fun showListCardBadgesPreferenceDialog(context: Context, preferences: Preference
         preferences.getHomeBadgeFileSize(),
         preferences.getHomeBadgeStatus(),
     )
-    MaterialAlertDialogBuilder(context)
+    com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(R.string.home_list_badges_title)
         .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
         .setPositiveButton(R.string.apply) { _, _ ->

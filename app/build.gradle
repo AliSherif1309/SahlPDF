@@ -159,6 +159,7 @@ android {
     namespace = 'com.gitlab.mudlej.MjPdfReader'
     testOptions {
         unitTests.returnDefaultValues = true
+        unitTests.includeAndroidResources = true
         execution = 'ANDROIDX_TEST_ORCHESTRATOR'
         animationsDisabled = true
     }
@@ -242,6 +243,7 @@ dependencies {
     }
 
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 
     androidTestImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test:core-ktx:1.7.0'
@@ -261,4 +263,18 @@ dependencies {
     androidTestImplementation 'com.squareup.okhttp3:okhttp-tls:4.12.0'
 
     androidTestUtil 'androidx.test:orchestrator:1.6.1'
+}
+
+// Pinned SahlTV packaged fonts are staged at build time; installed apps stay offline.
+def thmanyahAssets = layout.buildDirectory.dir('generated/thmanyah/assets')
+def prepareThmanyah = tasks.register('prepareThmanyah', Exec) {
+    workingDir rootProject.projectDir
+    commandLine(System.getProperty('os.name').toLowerCase().contains('windows') ? 'python' : 'python3',
+        'tools/prepare_thmanyah.py', '--output', thmanyahAssets.get().asFile.absolutePath)
+    inputs.file(rootProject.file('tools/prepare_thmanyah.py'))
+    outputs.files(['r', 'm', 'b'].collect { new File(thmanyahAssets.get().asFile, 'thmanyah/' + it + '.bin') })
+}
+android.sourceSets.main.assets.srcDir(thmanyahAssets.get().asFile)
+tasks.matching { it.name == 'preBuild' || it.name ==~ /merge.*Assets/ }.configureEach {
+    dependsOn(prepareThmanyah)
 }

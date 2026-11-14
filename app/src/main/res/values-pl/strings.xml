@@ -963,4 +963,5 @@
         <item quantity="many">%d sekund</item>
         <item quantity="other">%d sekundy</item>
     </plurals>
+    <string name="send_to_tv">Wyślij z telefonu</string>
 </resources>

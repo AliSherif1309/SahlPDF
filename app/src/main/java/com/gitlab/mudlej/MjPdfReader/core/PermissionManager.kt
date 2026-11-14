@@ -44,7 +44,7 @@ class PermissionManager(
             recheck()
             return
         }
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.storage_permission_rationale_title)
             .setMessage(R.string.storage_permission_rationale_message)
             .setPositiveButton(R.string.storage_permission_continue) { _, _ -> launchAccessRequest() }

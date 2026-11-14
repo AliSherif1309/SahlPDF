@@ -33,7 +33,7 @@ fun showHighlightColorsPreferenceDialog(
         overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
     }
 
-    val dialog = MaterialAlertDialogBuilder(context)
+    val dialog = com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(R.string.highlight_colors)
         .setView(recyclerView)
         .setPositiveButton(R.string.apply) { _, _ ->

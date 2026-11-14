@@ -38,7 +38,7 @@ internal fun showActionSelectionPreferenceDialog(
     adapter.onDragRequested = touchHelper::startDrag
     touchHelper.attachToRecyclerView(recyclerView)
 
-    val dialog = MaterialAlertDialogBuilder(context)
+    val dialog = com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(titleRes)
         .setView(recyclerView)
         .setPositiveButton(R.string.apply) { _, _ -> onApply(rows) }

@@ -16,7 +16,7 @@ class ScanSetupDialog(
 
     fun show() {
         var selected = if (pref.getScanMode() == ScanMode.SELECTED_LOCATIONS) 1 else 0
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.home_scan_choice_title)
             .setSingleChoiceItems(
                 arrayOf(

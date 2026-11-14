@@ -79,7 +79,7 @@ object TvMenu {
         items += (if (toolbarsShown) t("▢  Hide the toolbars", "▢  إخفاء الأشرطة") else t("▤  Show the toolbars", "▤  إظهار الأشرطة")) to h.toggleFullscreen
         items += t("⚙  Settings", "⚙  الإعدادات") to h.settings
         items += t("ⓘ  About", "ⓘ  حول") to h.about
-        AlertDialog.Builder(a)
+        com.aly.typography.ArabicCompatDialogBuilder(a)
             .setTitle("Sahl PDF")
             .setItems(items.map { it.first }.toTypedArray()) { _, w -> items[w].second() }
             .setOnDismissListener { onClosed() }

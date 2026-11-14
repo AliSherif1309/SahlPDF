@@ -954,4 +954,5 @@
         <item quantity="many">%d segundos</item>
         <item quantity="other">%d segundos</item>
     </plurals>
+    <string name="send_to_tv">Enviar do celular</string>
 </resources>

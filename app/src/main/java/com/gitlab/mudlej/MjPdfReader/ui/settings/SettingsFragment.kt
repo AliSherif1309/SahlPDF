@@ -379,7 +379,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     fun startDictionaryInstall() {
-        MaterialAlertDialogBuilder(requireContext())
+        com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
             .setTitle(R.string.dictionary_download_title)
             .setMessage(
                 getString(
@@ -423,7 +423,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             )
         }
         var job: Job? = null
-        val dialog = MaterialAlertDialogBuilder(requireContext())
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
             .setTitle(R.string.dictionary_downloading)
             .setView(container)
             .setNegativeButton(R.string.cancel, null)
@@ -446,7 +446,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             result.fold(
                 onSuccess = { rebuildPreferences() },
                 onFailure = { error ->
-                    MaterialAlertDialogBuilder(requireContext())
+                    com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
                         .setTitle(R.string.dictionary_download_failed)
                         .setMessage(error.localizedMessage ?: error.toString())
                         .setPositiveButton(R.string.ok, null)
@@ -590,7 +590,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun showImportWipeWarning(onConfirm: () -> Unit) {
-        val dialog = MaterialAlertDialogBuilder(requireContext())
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
             .setTitle(R.string.backup_import_title)
             .setMessage(R.string.backup_import_wipe_warning)
             .setPositiveButton(R.string.backup_import_wipe_action) { _, _ -> onConfirm() }
@@ -641,7 +641,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT),
             )
         }
-        val dialog = MaterialAlertDialogBuilder(requireContext())
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
             .setTitle(R.string.backup_import_running)
             .setView(container)
             .setCancelable(false)
@@ -672,7 +672,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun showBackupResultDialog(titleRes: Int, message: String) {
-        MaterialAlertDialogBuilder(requireContext())
+        com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
             .setTitle(titleRes)
             .setMessage(message)
             .setPositiveButton(R.string.ok, null)

@@ -14,7 +14,7 @@ fun confirmDialog(
     @StringRes confirmRes: Int,
     onConfirm: () -> Unit,
 ) {
-    MaterialAlertDialogBuilder(context)
+    com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(titleRes)
         .setMessage(message)
         .setPositiveButton(confirmRes) { _, _ -> onConfirm() }

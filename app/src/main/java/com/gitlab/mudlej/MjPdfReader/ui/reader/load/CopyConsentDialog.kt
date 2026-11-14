@@ -25,7 +25,7 @@ object CopyConsentDialog {
         val body = if (request.fitsOnDisk) message else {
             message + "\n\n" + activity.getString(R.string.copy_consent_no_space)
         }
-        val dialog = MaterialAlertDialogBuilder(activity)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.copy_consent_title)
             .setMessage(body)
             .setPositiveButton(R.string.copy_consent_copy) { _, _ -> onCopy() }

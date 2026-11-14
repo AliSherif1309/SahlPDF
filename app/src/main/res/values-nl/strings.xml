@@ -947,4 +947,5 @@
         <item quantity="one">%d seconde</item>
         <item quantity="other">%d seconden</item>
     </plurals>
+    <string name="send_to_tv">Verzenden vanaf telefoon</string>
 </resources>

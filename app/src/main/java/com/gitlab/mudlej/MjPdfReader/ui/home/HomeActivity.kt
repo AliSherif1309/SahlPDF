@@ -504,7 +504,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     private fun showBackupNoticesIfNeeded() {
         pref.getImportResultPending()?.let { message ->
             pref.setImportResultPending(null)
-            MaterialAlertDialogBuilder(this)
+            com.aly.typography.ArabicMaterialDialogBuilder(this)
                 .setTitle(R.string.backup_import_title)
                 .setMessage(message)
                 .setPositiveButton(R.string.ok, null)
@@ -699,7 +699,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         val labels = ReadingStatus.entries
             .map { it.name.formatEnumToTitle() }
             .toTypedArray()
-        MaterialAlertDialogBuilder(this)
+        com.aly.typography.ArabicMaterialDialogBuilder(this)
             .setTitle(R.string.home_set_status)
             .setItems(labels) { _, index ->
                 lifecycleScope.launch {
@@ -739,7 +739,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     }
 
     private fun deleteBatch(items: List<HomeItem>) {
-        MaterialAlertDialogBuilder(this)
+        com.aly.typography.ArabicMaterialDialogBuilder(this)
             .setTitle(R.string.delete_dialog_title)
             .setMessage(
                 resources.getQuantityString(

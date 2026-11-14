@@ -20,7 +20,7 @@ fun showScrollingInfoCardPreferenceDialog(context: Context, preferences: Prefere
         preferences.getFullScreenInfoShowPageNumber(),
         preferences.getFullScreenInfoShowReadingPercentage(),
     )
-    MaterialAlertDialogBuilder(context)
+    com.aly.typography.ArabicMaterialDialogBuilder(context)
         .setTitle(R.string.scrolling_info_card)
         .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
         .setPositiveButton(R.string.apply) { _, _ ->

@@ -53,7 +53,7 @@ class PdfThemeController(
             setPdfThemeMode(mode)
             onThemeChanged()
         }
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.dark_theme_for_pdf)
             .setMessage(R.string.pdf_theme_follows_system_dialog)
             .setView(view)

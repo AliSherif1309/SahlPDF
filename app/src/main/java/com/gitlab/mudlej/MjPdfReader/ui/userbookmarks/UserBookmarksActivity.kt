@@ -143,7 +143,7 @@ class UserBookmarksActivity : AppCompatActivity() {
             setPadding(horizontalPadding, 0, horizontalPadding, 0)
             addView(editText)
         }
-        MaterialAlertDialogBuilder(this)
+        com.aly.typography.ArabicMaterialDialogBuilder(this)
             .setTitle(R.string.rename_bookmark)
             .setView(container)
             .setPositiveButton(R.string.apply) { _, _ ->

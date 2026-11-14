@@ -53,7 +53,7 @@ class RecordOptionsDialog(
 
     private fun buildAndShow(item: HomeItem, record: PdfRecord?) {
         val binding = DialogRecordOptionsBinding.inflate(activity.layoutInflater)
-        val dialog = MaterialAlertDialogBuilder(activity, R.style.CompactMaterialAlertDialog)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(activity, R.style.CompactMaterialAlertDialog)
             .setView(binding.root)
             .create()
 
@@ -300,7 +300,7 @@ class RecordOptionsDialog(
         val binding = DialogRenameRecordBinding.inflate(activity.layoutInflater)
         binding.renameInput.setText(fileNameOf(item, record))
 
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.home_rename)
             .setView(binding.root)
             .setPositiveButton(R.string.ok) { _, _ ->
@@ -343,7 +343,7 @@ class RecordOptionsDialog(
     }
 
     private fun confirmDelete(item: HomeItem, record: PdfRecord?) {
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.delete_dialog_title)
             .setMessage(
                 activity.getString(R.string.home_delete_confirm_message, fileNameOf(item, record))

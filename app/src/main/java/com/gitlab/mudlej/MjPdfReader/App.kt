@@ -28,6 +28,8 @@ class App : Application() {
         if (AppProcess.isPdfMetadata(this)) {
             return
         }
+        com.aly.typography.ArabicFonts.install(this)
+        com.aly.typography.ArabicPdfTypography.install(this)
         DynamicColors.applyToActivitiesIfAvailable(this)
         com.gitlab.mudlej.MjPdfReader.tv.TvDefaults.apply(this)
         if (!ACRA.isACRASenderServiceProcess()) {

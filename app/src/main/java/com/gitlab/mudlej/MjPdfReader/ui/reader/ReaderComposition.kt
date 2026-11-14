@@ -845,7 +845,7 @@ class ReaderComposition(
     }
 
     private fun showRelocateDialog(record: PdfRecord) {
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.home_relocate_title)
             .setMessage(activity.getString(R.string.home_relocate_message, record.fileName))
             .setPositiveButton(R.string.home_relocate_action) { _, _ ->
@@ -858,7 +858,7 @@ class ReaderComposition(
     }
 
     private fun showTemporaryFileGoneDialog() {
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.stale_shared_title)
             .setMessage(R.string.stale_shared_message)
             .setPositiveButton(R.string.stale_shared_locate) { _, _ ->
@@ -874,7 +874,7 @@ class ReaderComposition(
         if (activity.isFinishing || activity.isDestroyed) {
             return
         }
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.home_relocate_mismatch_title)
             .setMessage(R.string.home_relocate_mismatch_message)
             .setPositiveButton(R.string.home_open_anyway) { _, _ ->

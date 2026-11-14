@@ -10,7 +10,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class OpenSourceLibrariesDialog : DialogFragment() {
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        return MaterialAlertDialogBuilder(requireContext())
+        return com.aly.typography.ArabicMaterialDialogBuilder(requireContext())
             .setTitle(R.string.libs)
             .setMessage(LIBRARIES.joinToString("\n\n") { it.text })
             .setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss() }

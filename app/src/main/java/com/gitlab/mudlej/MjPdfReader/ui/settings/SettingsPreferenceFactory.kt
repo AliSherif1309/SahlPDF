@@ -847,7 +847,7 @@ internal class SettingsPreferenceFactory(
         onReset: () -> Unit,
         onSelected: (Int) -> Unit,
     ) {
-        val dialog = MaterialAlertDialogBuilder(context)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(context)
             .setTitle(title)
             .setSingleChoiceItems(items.toTypedArray(), checkedIndex) { dialog, which ->
                 onSelected(which)
@@ -877,7 +877,7 @@ internal class SettingsPreferenceFactory(
             setSelection(text?.length ?: 0)
         }
 
-        val dialog = MaterialAlertDialogBuilder(context)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(context)
             .setTitle(R.string.translation_engine_custom)
             .setView(inputLayout)
             .setPositiveButton(R.string.save, null)
@@ -948,7 +948,7 @@ internal class SettingsPreferenceFactory(
         onActionSelected: (String) -> Unit,
     ) {
         val checkedIndex = actions.indexOfFirst { it.id == currentValue }
-        val dialog = MaterialAlertDialogBuilder(context)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(context)
             .setTitle(title)
             .setSingleChoiceItems(actions.toEntryTitles(), checkedIndex) { dialog, which ->
                 onActionSelected(actions[which].id)
@@ -1021,7 +1021,7 @@ internal class SettingsPreferenceFactory(
             )
         }
 
-        val dialog = MaterialAlertDialogBuilder(context)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(context)
             .setTitle(titleRes)
             .setView(layout)
             .setPositiveButton(R.string.apply, null)

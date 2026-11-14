@@ -58,7 +58,7 @@ class OnlinePdfController(
         var confirmedHttpLink = initialUri
             ?.takeIf { it.scheme.equals("http", ignoreCase = true) }
             ?.toString()
-        val dialog = MaterialAlertDialogBuilder(activity)
+        val dialog = com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.open_online_pdf)
             .setView(inputLayout)
             .setPositiveButton(R.string.open_online_pdf, null)
@@ -143,7 +143,7 @@ class OnlinePdfController(
         if (activity.isFinishing || activity.isDestroyed) {
             return
         }
-        MaterialAlertDialogBuilder(activity)
+        com.aly.typography.ArabicMaterialDialogBuilder(activity)
             .setTitle(R.string.insecure_redirect_title)
             .setMessage(activity.getString(R.string.insecure_redirect_message, target.hostForDisplay()))
             .setPositiveButton(R.string.proceed_anyway) { dialog, _ ->
