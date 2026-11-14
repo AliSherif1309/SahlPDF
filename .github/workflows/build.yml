@@ -91,7 +91,12 @@ jobs:
           fi
           ls -la out
       - name: Android unit tests and lint
-        run: ./gradlew :app:testDebugUnitTest :app:lintDebug --no-daemon
+        run: |
+          if ! ./gradlew :app:testDebugUnitTest :app:lintDebug --no-daemon; then
+            report=app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+            if [ -f "$report" ]; then cat "$report"; fi
+            exit 1
+          fi
       - name: Verify packaged fonts in every APK
         run: |
           for apk in out/*.apk; do python tools/prepare_thmanyah.py --check-apk "$apk"; done

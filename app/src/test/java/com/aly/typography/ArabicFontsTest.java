@@ -15,6 +15,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
 
+@android.annotation.TargetApi(28)
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28, application = ArabicApplication.class)
 public class ArabicFontsTest {
