@@ -947,4 +947,5 @@
         <item quantity="one">%d सेकंड</item>
         <item quantity="other">%d सेकंड</item>
     </plurals>
+    <string name="send_to_tv">फ़ोन से भेजें</string>
 </resources>

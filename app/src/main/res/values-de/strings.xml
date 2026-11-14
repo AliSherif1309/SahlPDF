@@ -947,4 +947,5 @@
         <item quantity="one">%d Sekunde</item>
         <item quantity="other">%d Sekunden</item>
     </plurals>
+    <string name="send_to_tv">Vom Smartphone senden</string>
 </resources>

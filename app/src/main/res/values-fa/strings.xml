@@ -947,4 +947,5 @@
         <item quantity="one">%d ثانیه</item>
         <item quantity="other">%d ثانیه</item>
     </plurals>
+    <string name="send_to_tv">ارسال از گوشی</string>
 </resources>

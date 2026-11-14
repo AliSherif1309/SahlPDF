@@ -939,4 +939,5 @@
     <plurals name="hide_delay_seconds">
         <item quantity="other">%d 秒</item>
     </plurals>
+    <string name="send_to_tv">從手機傳送</string>
 </resources>
