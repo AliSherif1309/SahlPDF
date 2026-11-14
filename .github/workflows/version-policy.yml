@@ -1,0 +1,30 @@
+name: Release version policy
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Test release policy
+        run: python3 -m unittest discover -s tools -p 'test_versions.py'
+      - name: Check semantic release version
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            python3 tools/check_versions.py --base "$PR_BASE"
+          elif [ "$EVENT" = push ]; then
+            python3 tools/check_versions.py --base "$PUSH_BASE"
+          else
+            python3 tools/check_versions.py
+          fi
