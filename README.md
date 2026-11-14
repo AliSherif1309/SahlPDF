@@ -16,6 +16,14 @@ One-time setup on the TV (so the library can see your books):
 adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
 ```
 
+## Sahl release versions
+
+This app has its own `major.minor.patch` version in `app/build.gradle`: patch for fixes, minor for features, major for breaking changes. Shipped source, resources, fonts, native libraries, build dependencies and packaging changes require a higher version. Tests and documentation alone do not require a bump or a new app release. CI checks pull requests and main; workflow-only rebuilds may retain the source version.
+
+Sahl PDF is currently **1.2.1**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
+
+Run `python3 -m unittest discover -s tools -p 'test_versions.py'` and `python3 tools/check_versions.py --base origin/main` before submitting app changes.
+
 ---
 
 <div align="center">

@@ -1,0 +1,20 @@
+{
+  "manual_code": false,
+  "prefixes": [
+    "app/",
+    "AndroidPdfViewer/",
+    "PdfiumAndroid/",
+    "build_dependencies/",
+    "gradle/"
+  ],
+  "files": [
+    "build.gradle",
+    "settings.gradle",
+    "gradle.properties",
+    "gradlew",
+    "gradlew.bat",
+    "build_dependencies.py",
+    "build_dictionary.py",
+    "mj-wrapper.gradle"
+  ]
+}

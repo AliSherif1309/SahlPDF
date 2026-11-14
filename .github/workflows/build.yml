@@ -1,6 +1,24 @@
 name: Build Sahl PDF
 on:
   push:
+    branches: [main]
+    paths: &apk-inputs
+      - 'app/**'
+      - 'AndroidPdfViewer/**'
+      - 'PdfiumAndroid/**'
+      - 'build_dependencies/**'
+      - 'gradle/**'
+      - '*.gradle'
+      - 'gradle.properties'
+      - 'gradlew*'
+      - 'build_dependencies.py'
+      - 'build_dictionary.py'
+      - '.github/workflows/build.yml'
+      - '!**/src/test/**'
+      - '!**/src/androidTest/**'
+      - '!**/README.md'
+  pull_request:
+    paths: *apk-inputs
   workflow_dispatch:
 permissions:
   contents: write
@@ -10,6 +28,22 @@ jobs:
     timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Test and check release versions
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          python3 -m unittest discover -s tools -p 'test_versions.py'
+          if [ "$EVENT" = pull_request ]; then
+            python3 tools/check_versions.py --base "$PR_BASE"
+          elif [ "$EVENT" = push ]; then
+            python3 tools/check_versions.py --base "$PUSH_BASE"
+          else
+            python3 tools/check_versions.py
+          fi
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: actions/setup-python@v5
@@ -90,14 +124,32 @@ jobs:
         with:
           name: SahlPDF
           path: out/*.apk
-      - name: Publish as the "latest" release
-        if: env.SIGNED == '1'
+      - name: Publish numbered release and update compatible latest downloads
+        if: env.SIGNED == '1' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # version.json: what Sahl TV reads for "Check for updates"
-          python3 -c "import json,os,subprocess; json.dump({'code': 1000+int(os.environ['GITHUB_RUN_NUMBER']), 'sahlpdf': '1.2', 'engine': os.environ.get('ENGINE',''), 'notes': subprocess.run(['git','log','-1','--format=%s'],capture_output=True,text=True).stdout.strip()}, open('out/version.json','w'))"
-          cat out/version.json
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest out/*.apk out/version.json --title "Sahl PDF (latest build)" \
-            --notes "Build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA::7}). For the Mi TV use SahlPDF-armeabi-v7a.apk (smaller) or SahlPDF.apk (works everywhere). PDF engine: ${ENGINE}. Based on MJ PDF by Mudlej (GPLv3)."
+          set -euo pipefail
+          VERSION=$(python3 tools/check_versions.py --print-version)
+          export VERSION
+          python3 - <<'PY'
+          import json, os, subprocess
+          json.dump({
+              'code': 1000 + int(os.environ['GITHUB_RUN_NUMBER']),
+              'sahlpdf': os.environ['VERSION'],
+              'engine': os.environ.get('ENGINE', ''),
+              'notes': subprocess.check_output(['git', 'log', '-1', '--format=%s'], text=True).strip()
+          }, open('out/version.json', 'w'))
+          PY
+          (cd out && sha256sum *.apk > SHA256SUMS)
+          TAG="build-$GITHUB_RUN_NUMBER"
+          NOTES="Sahl PDF $VERSION · build $GITHUB_RUN_NUMBER ($GITHUB_SHA). For Mi TV use SahlPDF-armeabi-v7a.apk or the universal SahlPDF.apk. PDF engine: $ENGINE. Based on MJ PDF 3.1.0 by Mudlej (GPLv3)."
+          gh release create "$TAG" out/*.apk out/version.json out/SHA256SUMS --target "$GITHUB_SHA" --title "Sahl PDF $VERSION · build $GITHUB_RUN_NUMBER" --notes "$NOTES" --latest=false
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest out/*.apk out/SHA256SUMS --clobber
+            gh release upload latest out/version.json --clobber
+            gh release edit latest --latest=false --title "Sahl PDF $VERSION (latest = $TAG)" --notes "$NOTES"
+          else
+            gh release create latest out/*.apk out/version.json out/SHA256SUMS --target "$GITHUB_SHA" --title "Sahl PDF $VERSION (latest = $TAG)" --notes "$NOTES" --latest=false
+          fi
+          gh release edit "$TAG" --latest
