@@ -8,6 +8,10 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Sahl PDF: works on TVs (remote, no touch screen) as well as phones -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -34,6 +38,8 @@
         android:supportsRtl="true"
         android:theme="@style/MJ_PDF_THEME"
         android:usesCleartextTraffic="true">
+        <activity android:name=".scanner.ScannerActivity" android:exported="false" android:theme="@style/HomeTheme" />
+        <activity android:name=".scanner.ScanCameraActivity" android:exported="false" android:theme="@style/HomeTheme" />
         <activity android:name=".update.UpdateActivity" android:exported="false" android:theme="@style/HomeTheme" />
         <activity android:name=".ui.tools.PageManagerActivity" android:exported="false" android:theme="@style/HomeTheme" />
         <activity android:name=".ui.tools.PdfToolsActivity" android:exported="false" android:theme="@style/HomeTheme" />

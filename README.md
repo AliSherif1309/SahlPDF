@@ -16,6 +16,35 @@ One-time setup on the TV (so the library can see your books):
 adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
 ```
 
+## Document scanner (1.6.0)
+
+Open **PDF Tools → Document scanner** on your phone. Capture with the embedded
+CameraX camera (tap to focus and optional continuous light), or import an image.
+OpenCV suggests page corners after capture. Review and drag all four corners;
+a magnified loupe helps fine adjustment. Preview the perspective-corrected result.
+
+Keep Natural color for faint handwriting, signatures and stamps. Grayscale and
+adaptive black-and-white processing are optional and reversible. Original photos
+are never modified. Add, retake, reorder, rotate or remove pages; undo up to 20
+edits. The local draft reopens after leaving the scanner or restarting the app.
+**New scan** explicitly discards the previous draft and its originals.
+
+Export creates A4 PDF pages with small margins and JPEG quality 94. Output is
+bounded to a 3,508-pixel longest side without upscaling; it is image-based, not OCR.
+Inputs are sampled to a maximum 4,096-pixel side for processing. Limits are 50 pages,
+32 MiB per source image and 512 MiB per local draft. Export a PDF for a separate
+copy: private drafts are device-local and are not included in cloud backup.
+
+Processing works offline from first use, with no Google Play Services scanner
+download or document uploads. Camera permission is requested only when capturing;
+the existing reader remains installable on TVs and devices without cameras.
+CameraX and OpenCV are Apache-2.0 dependencies; upstream GPLv3 attribution remains.
+
+This is the first scanner phase. Automatic capture, live edge overlays,
+shadow/glare removal and advanced quality guidance remain later work.
+Blur guidance is heuristic and does not replace reviewing the preview.
+Physical camera and real-document quality still need phone testing.
+
 ## In-app updates (1.5.0)
 
 Open the home menu → **Check for updates**, or Settings → ⋮ → **Check for updates**. When a newer compatible stable release
@@ -50,7 +79,7 @@ Temporary snapshots are removed on normal close; Android may reclaim cache files
 Signed/interactive documents may lose document-level forms, signatures and
 bookmarks in the exported copy. Removing pages is not secure redaction.
 
-Camera scanning remains a later phase. This editor does not capture or enhance scans.
+Camera scanning is available separately in PDF Tools → Document scanner.
 OCR, existing-text editing, Office conversion and secure redaction are outside the
 current roadmap.
 
@@ -75,8 +104,7 @@ Extracted/merged documents may not retain document-level signatures, forms, book
 Extraction is not secure redaction. Always retain original signed or interactive documents.
 
 The existing reader already provides highlights, reusable handwritten signatures and form filling.
-Camera scanning with perspective correction, PDF compression presets, stamps, and document folders
-remain future work; they are not advertised as implemented.
+PDF compression presets, stamps, and document folders remain future work; they are not advertised as implemented.
 
 PDF operations use [PDFBox-Android](https://github.com/TomRoush/PdfBox-Android) (Apache-2.0).
 Its optional JPEG 2000 decoder is not bundled. Existing compressed PDF page images are
@@ -91,7 +119,7 @@ invalid ranges, encrypted inputs and image PDF output.
 
 This app has its own `major.minor.patch` version in `app/build.gradle`: patch for fixes, minor for features, major for breaking changes. Shipped source, resources, fonts, native libraries, build dependencies and packaging changes require a higher version. Tests and documentation alone do not require a bump or a new app release. CI checks pull requests and main; workflow-only rebuilds may retain the source version.
 
-Sahl PDF is currently **1.5.0**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
+Sahl PDF is currently **1.6.0**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
 
 Run `python3 -m unittest discover -s tools -p 'test_versions.py'` and `python3 tools/check_versions.py --base origin/main` before submitting app changes.
 

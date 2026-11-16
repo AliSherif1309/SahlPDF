@@ -33,7 +33,7 @@ jobs:
       - name: Unit tests and lint
         run: |
           chmod +x gradlew
-          ./gradlew :app:testDebugUnitTest --tests '*PageSelectionTest' --tests '*PagePlanTest' --tests '*UpdatePolicyTest' --no-daemon
+          ./gradlew :app:testDebugUnitTest --tests '*PageSelectionTest' --tests '*PagePlanTest' --tests '*UpdatePolicyTest' --tests '*ScanGeometryTest' --no-daemon
           if ! ./gradlew :app:lintDebug --no-daemon; then
             python3 -c 'import xml.etree.ElementTree as E; r=E.parse("app/build/reports/lint-results-debug.xml"); [print(E.tostring(i, encoding="unicode")) for i in r.findall("issue") if i.get("severity") in ("Error","Fatal")]'
             exit 1
@@ -51,7 +51,8 @@ jobs:
           api-level: 35
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsEngineTest,com.gitlab.mudlej.MjPdfReader.ui.tools.PageManagerTest,com.gitlab.mudlej.MjPdfReader.update.UpdateRepositoryTest --no-daemon
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsEngineTest,com.gitlab.mudlej.MjPdfReader.ui.tools.PageManagerTest,com.gitlab.mudlej.MjPdfReader.update.UpdateRepositoryTest,com.gitlab.mudlej.MjPdfReader.scanner.ScannerProcessorTest,com.gitlab.mudlej.MjPdfReader.scanner.ScannerWorkflowTest --no-daemon
       - uses: actions/upload-artifact@v4
         if: always()
         with:
