@@ -2,6 +2,7 @@
 
 package com.gitlab.mudlej.MjPdfReader.ui.home
 
+import com.gitlab.mudlej.MjPdfReader.tv.isTv
 import android.content.Intent
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -53,6 +54,11 @@ class HomeMenuDialog(
         SegmentedButtonStyler.attach(binding.sortGroup)
         SegmentedButtonStyler.attach(binding.foldersModeGroup)
 
+        binding.pdfToolsRow.visibility = if (activity.isTv()) View.GONE else View.VISIBLE
+        binding.pdfToolsRow.setOnClickListener {
+            dialog.dismiss()
+            activity.startActivity(Intent(activity, com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsActivity::class.java))
+        }
         binding.settingsRow.setOnClickListener {
             dialog.dismiss()
             activity.startActivity(Intent(activity, SettingsActivity::class.java))

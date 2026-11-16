@@ -3,8 +3,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <item android:id="@+id/pdfToolsOption" android:title="@string/pdf_tools_title" app:showAsAction="never" />
-
     <item
         android:id="@+id/sendToTvOption"
         android:icon="@drawable/ic_send_to_tv"

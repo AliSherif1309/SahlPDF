@@ -380,10 +380,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         onBackPressedDispatcher.addCallback(this, homeBackCallback)
         binding.searchBar.inflateMenu(R.menu.home_search_bar)
         binding.searchBar.setOnMenuItemClickListener { menuItem ->
-            if (menuItem.itemId == R.id.pdfToolsOption) {
-                startActivity(Intent(this, com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsActivity::class.java))
-                true
-            } else if (menuItem.itemId == R.id.homeMenuOption) {
+            if (menuItem.itemId == R.id.homeMenuOption) {
                 menuDialog.show()
                 true
             } else if (menuItem.itemId == R.id.sendToTvOption) {

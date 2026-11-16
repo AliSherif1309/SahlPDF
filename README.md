@@ -18,7 +18,7 @@ adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
 
 ## PDF Tools (1.3.0)
 
-Open **PDF Tools** from the home search bar overflow menu on your phone.
+Open **PDF Tools** from the home menu (three dots) on your phone.
 
 | Tool | Available behavior |
 |---|---|
