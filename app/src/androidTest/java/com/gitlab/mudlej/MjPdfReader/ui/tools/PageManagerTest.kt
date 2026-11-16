@@ -99,15 +99,15 @@ class PageManagerTest {
     }
     @Test fun protectedInputIsRejectedAndSnapshotRemoved() = runBlocking {
         val input = fixture()
-        val protected = File(directory, "protected.pdf")
+        val encrypted = File(directory, "protected.pdf")
         PDDocument.load(input).use {
             // Empty user password still counts as encrypted and must be rejected.
             it.protect(StandardProtectionPolicy("owner", "", AccessPermission()))
-            it.save(protected)
+            it.save(encrypted)
         }
         val snapshot = File(directory, "private.pdf")
         try {
-            PageManagerEngine(context).stage(Uri.fromFile(protected), snapshot)
+            PageManagerEngine(context).stage(Uri.fromFile(encrypted), snapshot)
             fail("Expected protected input rejection")
         } catch (_: IllegalArgumentException) { }
         assertFalse(snapshot.exists())

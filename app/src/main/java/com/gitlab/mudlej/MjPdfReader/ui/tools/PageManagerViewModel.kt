@@ -11,6 +11,7 @@ import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -129,7 +130,6 @@ class PageManagerViewModel(application: Application) : AndroidViewModel(applicat
         mutable.value = s.copy(busy = true, message = null)
         viewModelScope.launch {
             var result: File? = null
-            var targetOpened = false
             try {
                 withContext(Dispatchers.IO) {
                     result = temporary("sahl-pages-result-")
@@ -137,7 +137,6 @@ class PageManagerViewModel(application: Application) : AndroidViewModel(applicat
                     currentCoroutineContext().ensureActive()
                     val resolver = getApplication<Application>().contentResolver
                     val stream = resolver.openOutputStream(uri, "wt") ?: throw IOException("Cannot save")
-                    targetOpened = true
                     stream.use { output ->
                         result!!.inputStream().use { input ->
                             val buffer = ByteArray(64 * 1024)
@@ -152,21 +151,24 @@ class PageManagerViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 mutable.value = s.copy(dirty = false, message = PageManagerState.Message.SAVED)
             } catch (cancelled: CancellationException) {
-                if (targetOpened) deleteOutput(uri)
+                deleteOutput(uri)
                 throw cancelled
             } catch (_: Exception) {
                 // CreateDocument supplies a new output; never remove or write the input.
                 deleteOutput(uri)
                 mutable.value = s.copy(busy = false, message = PageManagerState.Message.FAILED)
             } finally {
-                result?.let { it.delete(); files.remove(it) }
+                withContext(Dispatchers.IO + NonCancellable) {
+                    result?.let { it.delete(); files.remove(it) }
+                }
             }
         }
     }
-    private fun deleteOutput(uri: Uri) {
+    private suspend fun deleteOutput(uri: Uri) = withContext(Dispatchers.IO + NonCancellable) {
         if (uri != sourceUri) runCatching {
             DocumentsContract.deleteDocument(getApplication<Application>().contentResolver, uri)
         }
+        Unit
     }
     private fun temporary(prefix: String): File =
         File.createTempFile(prefix, ".pdf", getApplication<Application>().cacheDir).also { files.add(it) }
