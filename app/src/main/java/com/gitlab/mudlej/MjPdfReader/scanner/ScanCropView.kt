@@ -18,7 +18,7 @@ class ScanCropView(context: Context) : View(context) {
     private var selected = -1
     private val bounds = RectF()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val accent = MaterialColors.getColor(this, com.google.android.material.R.attr.colorPrimary, Color.CYAN)
+    private val accent = MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary, Color.CYAN)
     var onCornersChanged: ((List<ScanPoint>) -> Unit)? = null
     init {
         isClickable = true
