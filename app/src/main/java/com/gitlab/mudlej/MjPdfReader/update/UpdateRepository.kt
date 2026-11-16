@@ -40,8 +40,8 @@ class UpdateRepository(
         if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
 
     fun cached(): AppUpdate? = runCatching {
-        decode(JSONObject(preferences.getString("candidate", null) ?: return null))
-            .takeIf { update -> installed().let { UpdatePolicy.newer(update.version, update.code, it.versionName.orEmpty(), code(it)) } }
+        (preferences.getString("candidate", null)?.let { decode(JSONObject(it)) })
+            ?.takeIf { update -> installed().let { UpdatePolicy.newer(update.version, update.code, it.versionName.orEmpty(), code(it)) } }
     }.getOrNull()
     fun due(now: Long = System.currentTimeMillis()): Boolean {
         val last = preferences.getLong("last-check", 0)
