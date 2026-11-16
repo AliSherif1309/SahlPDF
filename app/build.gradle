@@ -89,6 +89,8 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // Runtime identity is verified against PdfiumAndroid before release upload.
+            pickFirsts += ["**/libc++_shared.so"]
         }
     }
 

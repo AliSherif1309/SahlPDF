@@ -151,6 +151,13 @@ class ScannerProcessorTest {
                 assertTrue(it.getPage(1).mediaBox.width > it.getPage(1).mediaBox.height)
                 assertTrue(it.getPage(0).resources.xObjectNames.iterator().hasNext())
             }
+            val reader = com.shockwave.pdfium.PdfiumCore(context)
+            val document = reader.newDocument(output.readBytes())
+            try {
+                assertEquals(2, reader.getPageCount(document))
+                reader.openPage(document, 0)
+                assertTrue(reader.getPageWidthPoint(document, 0) > 0)
+            } finally { reader.closeDocument(document) }
         } finally { output.delete() }
     }
     @Test fun draftRejectsTraversalAndMalformedCrop() {
