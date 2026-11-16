@@ -16,6 +16,25 @@ One-time setup on the TV (so the library can see your books):
 adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
 ```
 
+## Visual page manager (1.4.0)
+
+Open **PDF Tools → Organize pages** on your phone. A thumbnail grid lets you
+select pages, move selected groups earlier/later, rotate by 90°, duplicate,
+delete (retaining at least one page), and undo up to 20 edits. Swiping the action
+row reveals all controls on small screens. Use **Save a copy** to export;
+source PDFs are never overwritten. Page text remains searchable.
+
+The editor snapshots the input privately (maximum 128 MiB / 1,000 pages).
+Previews load on demand with serialized rendering and an 8 MiB bitmap cache.
+Editing survives rotation; after process death, open the document again.
+Temporary snapshots are removed on normal close; Android may reclaim cache files.
+Signed/interactive documents may lose document-level forms, signatures and
+bookmarks in the exported copy. Removing pages is not secure redaction.
+
+Camera scanning remains a later phase. This editor does not capture or enhance scans.
+OCR, existing-text editing, Office conversion and secure redaction are outside the
+current roadmap.
+
 ## PDF Tools (1.3.0)
 
 Open **PDF Tools** from the home menu (three dots) on your phone.
@@ -37,8 +56,8 @@ Extracted/merged documents may not retain document-level signatures, forms, book
 Extraction is not secure redaction. Always retain original signed or interactive documents.
 
 The existing reader already provides highlights, reusable handwritten signatures and form filling.
-Camera scanning with perspective correction, Arabic/English OCR, PDF compression presets,
-stamps, and document folders remain future work; they are not advertised as implemented.
+Camera scanning with perspective correction, PDF compression presets, stamps, and document folders
+remain future work; they are not advertised as implemented.
 
 PDF operations use [PDFBox-Android](https://github.com/TomRoush/PdfBox-Android) (Apache-2.0).
 Its optional JPEG 2000 decoder is not bundled. Existing compressed PDF page images are
@@ -53,7 +72,7 @@ invalid ranges, encrypted inputs and image PDF output.
 
 This app has its own `major.minor.patch` version in `app/build.gradle`: patch for fixes, minor for features, major for breaking changes. Shipped source, resources, fonts, native libraries, build dependencies and packaging changes require a higher version. Tests and documentation alone do not require a bump or a new app release. CI checks pull requests and main; workflow-only rebuilds may retain the source version.
 
-Sahl PDF is currently **1.3.0**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
+Sahl PDF is currently **1.4.0**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
 
 Run `python3 -m unittest discover -s tools -p 'test_versions.py'` and `python3 tools/check_versions.py --base origin/main` before submitting app changes.
 

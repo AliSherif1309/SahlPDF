@@ -33,6 +33,7 @@
         android:supportsRtl="true"
         android:theme="@style/MJ_PDF_THEME"
         android:usesCleartextTraffic="true">
+        <activity android:name=".ui.tools.PageManagerActivity" android:exported="false" android:theme="@style/HomeTheme" />
         <activity android:name=".ui.tools.PdfToolsActivity" android:exported="false" android:theme="@style/HomeTheme" />
         <activity
             android:name=".ui.home.HomeActivity"

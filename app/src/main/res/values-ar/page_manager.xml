@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="page_manager_title">تنظيم الصفحات</string>
+    <string name="page_manager_open">فتح PDF</string>
+    <string name="page_manager_undo">تراجع</string>
+    <string name="page_manager_all">تحديد الكل</string>
+    <string name="page_manager_none">إلغاء التحديد</string>
+    <string name="page_manager_earlier">نقل للأمام</string>
+    <string name="page_manager_later">نقل للخلف</string>
+    <string name="page_manager_rotate">تدوير ٩٠°</string>
+    <string name="page_manager_duplicate">تكرار</string>
+    <string name="page_manager_delete">حذف</string>
+    <string name="page_manager_count">%1$d صفحة · %2$d محددة</string>
+    <string name="page_manager_page">الصفحة %1$d · الأصل %2$d · +%3$d°</string>
+    <string name="page_manager_intro">اختر ملف PDF لترتيب صفحاته. تعمل الأداة دون إنترنت على نسخة خاصة. الحد ١٠٠٠ صفحة و١٢٨ ميبيبايت. الملفات المحمية غير مدعومة.</string>
+    <string name="page_manager_help">اضغط على الصفحات لتحديدها. اسحب شريط الإجراءات لعرض بقية الأدوات. احفظ نسخة للاحتفاظ بالتعديلات. يبقى الأصل كما هو؛ قد لا تنتقل النماذج والتوقيعات والإشارات المرجعية.</string>
+    <string name="page_manager_failed">تعذر إكمال العملية. تحقق من الوصول للملف والمساحة وحد ١٠٠٠ صفحة و١٢٨ ميبيبايت. قد لا تفتح الملفات المحمية أو التالفة.</string>
+    <string name="page_manager_delete_confirm">هل تريد إزالة %1$d من الصفحات المحددة من هذه النسخة؟ يمكنك التراجع.</string>
+    <string name="page_manager_discard">هل تريد مغادرة التحرير؟ ستفقد التعديلات غير المحفوظة وتُلغى أي عملية جارية.</string>
+    <string name="page_manager_leave">مغادرة</string>
+    <string name="page_manager_preview_loading">جارٍ تحميل المعاينة…</string>
+    <string name="page_manager_preview_failed">المعاينة غير متاحة</string>
+</resources>
