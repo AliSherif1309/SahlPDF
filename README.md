@@ -1,6 +1,6 @@
-# Sahl PDF — MJ PDF for Android TV
+# Sahl PDF — Android phone & TV
 
-Sahl PDF is a TV edition of [MJ PDF](https://gitlab.com/mudlej_android/mj_pdf_reader) by Mudlej, under the same GPLv3 licence.
+Sahl PDF is a phone and TV edition of [MJ PDF](https://gitlab.com/mudlej_android/mj_pdf_reader) by Mudlej, under the same GPLv3 licence.
 Changes for TV (see `app/src/main/java/com/gitlab/mudlej/MjPdfReader/tv/`):
 
 - **Send from phone**: the TV shows an address and a 6-digit code; open it on your phone (same Wi-Fi), pick one or more PDFs and press Send. Each book is saved once in `Download/Sahl PDF` and appears in the Library.
@@ -16,11 +16,44 @@ One-time setup on the TV (so the library can see your books):
 adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
 ```
 
+## PDF Tools (1.3.0)
+
+Open **PDF Tools** from the home menu (three dots) on your phone.
+
+| Tool | Available behavior |
+|---|---|
+| Merge PDFs | Combine files in your chosen order while retaining searchable text |
+| Extract & reorder | Select ranges such as `1-3,7,5-4`; repeat pages; accepts Arabic/Persian digits |
+| Images to PDF | Ordered A4 pages, camera-orientation correction, bounded image decoding |
+
+Processing stays on your device. Sources are read-only. Each result is staged privately,
+reopened to verify page count, then exported through Android's Save a copy picker.
+The selection and operation survive screen rotation. After process death, choose inputs again.
+Up to 50 input files and 1,000 output pages per operation prevent unbounded jobs.
+Images are resized to at most 2,048 pixels on the longest side and JPEG encoded at 90%;
+this is image conversion, not document OCR or lossless image archiving.
+Password-protected files are rejected in these tools; the reader's existing password support is unchanged.
+Extracted/merged documents may not retain document-level signatures, forms, bookmarks, or metadata.
+Extraction is not secure redaction. Always retain original signed or interactive documents.
+
+The existing reader already provides highlights, reusable handwritten signatures and form filling.
+Camera scanning with perspective correction, Arabic/English OCR, PDF compression presets,
+stamps, and document folders remain future work; they are not advertised as implemented.
+
+PDF operations use [PDFBox-Android](https://github.com/TomRoush/PdfBox-Android) (Apache-2.0).
+Its optional JPEG 2000 decoder is not bundled. Existing compressed PDF page images are
+preserved when pages are copied; these tools do not render or recompress imported PDF pages.
+The existing app and upstream attribution remain GPLv3.
+
+Validation: `PDF Tools tests` runs page-range unit tests, Android lint, and emulator tests
+checking actual merged/extracted text, page ordering, original-byte preservation,
+invalid ranges, encrypted inputs and image PDF output.
+
 ## Sahl release versions
 
 This app has its own `major.minor.patch` version in `app/build.gradle`: patch for fixes, minor for features, major for breaking changes. Shipped source, resources, fonts, native libraries, build dependencies and packaging changes require a higher version. Tests and documentation alone do not require a bump or a new app release. CI checks pull requests and main; workflow-only rebuilds may retain the source version.
 
-Sahl PDF is currently **1.2.1**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
+Sahl PDF is currently **1.3.0**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
 
 Run `python3 -m unittest discover -s tools -p 'test_versions.py'` and `python3 tools/check_versions.py --base origin/main` before submitting app changes.
 

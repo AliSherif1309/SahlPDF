@@ -61,3 +61,6 @@
 
 -keep class com.google.gson.reflect.TypeToken { *; }
 -keep class * extends com.google.gson.reflect.TypeToken
+
+# PDFBox optional JPEG 2000 decoder is not bundled; page imports preserve its compressed bytes.
+-dontwarn com.gemalto.jp2.**
