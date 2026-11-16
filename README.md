@@ -18,7 +18,7 @@ adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
 
 ## In-app updates (1.5.0)
 
-Open the home menu → **Check for updates**. When a newer compatible stable release
+Open the home menu → **Check for updates**, or Settings → ⋮ → **Check for updates**. When a newer compatible stable release
 is available, the home screen also shows an **Update** banner. Automatic checks
 run when opening home, at most once per day; turn them off in App updates.
 APK downloads happen only after you choose **Download update**.
