@@ -64,6 +64,12 @@ class PdfToolsActivity : AppCompatActivity() {
         }
         root.addView(ScrollView(this).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
         content.addView(TextView(this).apply { setText(R.string.pdf_tools_intro) })
+        content.addView(MaterialButton(this).apply {
+            setText(R.string.page_manager_title)
+            setOnClickListener {
+                startActivity(android.content.Intent(this@PdfToolsActivity, PageManagerActivity::class.java))
+            }
+        })
         val titles = listOf(R.string.pdf_tools_merge, R.string.pdf_tools_pages, R.string.pdf_tools_images)
         PdfTool.entries.forEachIndexed { index, tool ->
             val button = MaterialButton(this).apply {

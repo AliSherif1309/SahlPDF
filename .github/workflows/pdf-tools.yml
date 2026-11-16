@@ -33,7 +33,7 @@ jobs:
       - name: Unit tests and lint
         run: |
           chmod +x gradlew
-          ./gradlew :app:testDebugUnitTest --tests '*PageSelectionTest' --no-daemon
+          ./gradlew :app:testDebugUnitTest --tests '*PageSelectionTest' --tests '*PagePlanTest' --no-daemon
           if ! ./gradlew :app:lintDebug --no-daemon; then
             python3 -c 'import xml.etree.ElementTree as E; r=E.parse("app/build/reports/lint-results-debug.xml"); [print(E.tostring(i, encoding="unicode")) for i in r.findall("issue") if i.get("severity") in ("Error","Fatal")]'
             exit 1
@@ -51,7 +51,7 @@ jobs:
           api-level: 35
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsEngineTest --no-daemon
+          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsEngineTest,com.gitlab.mudlej.MjPdfReader.ui.tools.PageManagerTest --no-daemon
       - uses: actions/upload-artifact@v4
         if: always()
         with:
