@@ -118,7 +118,7 @@ class ScannerActivity : AppCompatActivity() {
         val filterRow = row()
         val labels = listOf(R.string.scanner_natural, R.string.scanner_gray, R.string.scanner_mono)
         ScanFilter.entries.forEachIndexed { index, filter ->
-            filters += button(filterRow, labels[index]) { model.filter(filter) }.apply { isCheckable = true }
+            filters += button(filterRow, labels[index]) { model.filter(filter); render(model.state.value) }.apply { isCheckable = true }
         }
         status = TextView(this).apply {
             id = R.id.scanner_status

@@ -20,7 +20,8 @@ import org.opencv.imgproc.Imgproc
 
 /** Serialized by the scanner ViewModel. Source files are immutable. */
 class ScanImageProcessor {
-    private fun initialize() { check(OpenCVLoader.initLocal()) { "Image processor unavailable" } }
+    companion object { private val available: Boolean by lazy { OpenCVLoader.initLocal() } }
+    private fun initialize() { check(available) { "Image processor unavailable" } }
 
     fun decode(file: File, maxSide: Int): Bitmap {
         require(maxSide in 128..4096)
@@ -73,7 +74,7 @@ class ScanImageProcessor {
                 val hierarchy = Mat()
                 try {
                     Imgproc.findContours(mask, contours, hierarchy, Imgproc.RETR_LIST, Imgproc.CHAIN_APPROX_SIMPLE)
-                    for (contour in contours.sortedByDescending { Imgproc.contourArea(it) }.take(24)) {
+                    for (contour in contours.map { it to Imgproc.contourArea(it) }.sortedByDescending { it.second }.take(24).map { it.first }) {
                         val curve = MatOfPoint2f(*contour.toArray()); val approx = MatOfPoint2f()
                         try {
                             Imgproc.approxPolyDP(curve, approx, 0.02 * Imgproc.arcLength(curve, true), true)

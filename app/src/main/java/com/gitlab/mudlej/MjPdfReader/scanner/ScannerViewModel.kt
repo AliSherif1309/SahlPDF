@@ -125,6 +125,7 @@ class ScannerViewModel(application: Application, private val saved: SavedStateHa
         viewModelScope.launch {
             try {
                 val file = withContext(Dispatchers.IO) { lock.withLock { store.captureFile(draft, retake) } }
+                saved.remove<Boolean>("capture_success")
                 saved["capture"] = file.name
                 saved["retake"] = if (retake) draft.selectedPage()?.id else null
                 mutable.value = s
@@ -134,6 +135,7 @@ class ScannerViewModel(application: Application, private val saved: SavedStateHa
         }
     }
     fun captureReturned(success: Boolean) {
+        if (saved.get<String>("capture") == null) return
         saved["capture_success"] = success
         consumeCapture()
     }
