@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<!-- PDF Tools currently ships English and Arabic; other app locales use English fallback. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <string name="pdf_tools_title">PDF Tools</string>
     <string name="pdf_tools_back">Back</string>
     <string name="pdf_tools_intro">Offline tools • no account, ads, or watermark. Originals stay unchanged. Up to 50 files and 1,000 output pages per job.</string>
