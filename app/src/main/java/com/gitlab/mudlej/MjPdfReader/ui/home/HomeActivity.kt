@@ -86,6 +86,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     private lateinit var libraryTab: LibraryTabController
     private lateinit var foldersTab: FoldersTabController
     private lateinit var rendering: HomeRendering
+    private var updateBanner: com.gitlab.mudlej.MjPdfReader.update.UpdateBannerController? = null
     private val refreshJobs = mutableSetOf<Job>()
 
     private val homeViewModel: HomeViewModel by viewModels()
@@ -171,6 +172,8 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
         )
         setupMenuAndNavigation()
         setupOpenFab()
+        updateBanner = com.gitlab.mudlej.MjPdfReader.update.UpdateBannerController(
+            this, binding.updateBanner, binding.updateBannerText, binding.updateBannerButton)
         rendering.observeLibraryIndex()
         maybeShowWhatsNew(launchIntro)
         handleRelocateIntent(intent)
@@ -498,6 +501,7 @@ class HomeActivity : AppCompatActivity(), HomeItemFunctions {
     override fun onResume() {
         super.onResume()
         rendering.onResume()
+        updateBanner?.refresh()
         showBackupNoticesIfNeeded()
     }
 

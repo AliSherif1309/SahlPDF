@@ -59,6 +59,10 @@ class HomeMenuDialog(
             dialog.dismiss()
             activity.startActivity(Intent(activity, com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsActivity::class.java))
         }
+        binding.updatesRow.setOnClickListener {
+            dialog.dismiss()
+            activity.startActivity(Intent(activity, com.gitlab.mudlej.MjPdfReader.update.UpdateActivity::class.java))
+        }
         binding.settingsRow.setOnClickListener {
             dialog.dismiss()
             activity.startActivity(Intent(activity, SettingsActivity::class.java))

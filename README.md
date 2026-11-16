@@ -16,6 +16,25 @@ One-time setup on the TV (so the library can see your books):
 adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
 ```
 
+## In-app updates (1.5.0)
+
+Open the home menu → **Check for updates**. When a newer compatible stable release
+is available, the home screen also shows an **Update** banner. Automatic checks
+run when opening home, at most once per day; turn them off in App updates.
+APK downloads happen only after you choose **Download update**.
+
+The updater selects the device ABI from actual published APK version codes,
+downloads from the numbered GitHub release, checks SHA-256, package identity,
+version and the installed signing key, then opens Android's installer.
+Android may ask you to allow Sahl PDF to install apps; return and tap Install.
+Installing is always confirmed by Android. Library/settings remain in place.
+
+Install this first updater-enabled release manually once. Future updates can
+then be downloaded from inside Sahl PDF. Debug builds or copies signed with a
+different key cannot update to the official release in place.
+Checks contact GitHub; PDF documents are never uploaded.
+There is no scheduled background checking or silent installation.
+
 ## Visual page manager (1.4.0)
 
 Open **PDF Tools → Organize pages** on your phone. A thumbnail grid lets you
@@ -72,7 +91,7 @@ invalid ranges, encrypted inputs and image PDF output.
 
 This app has its own `major.minor.patch` version in `app/build.gradle`: patch for fixes, minor for features, major for breaking changes. Shipped source, resources, fonts, native libraries, build dependencies and packaging changes require a higher version. Tests and documentation alone do not require a bump or a new app release. CI checks pull requests and main; workflow-only rebuilds may retain the source version.
 
-Sahl PDF is currently **1.4.0**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
+Sahl PDF is currently **1.5.0**, based on **MJ PDF 3.1.0**. This standalone reader is versioned independently from the lightweight Sahl PDF companion in SahlTV-Launcher. Android update codes keep the existing CI build-number scheme. Signed releases use immutable `build-N` tags; the `latest` download tag remains compatible with Sahl TV. Release titles and update metadata read the app version from Gradle.
 
 Run `python3 -m unittest discover -s tools -p 'test_versions.py'` and `python3 tools/check_versions.py --base origin/main` before submitting app changes.
 
