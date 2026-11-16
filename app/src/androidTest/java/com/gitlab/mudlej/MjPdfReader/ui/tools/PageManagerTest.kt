@@ -73,7 +73,7 @@ class PageManagerTest {
             assertEquals(3, doc.numberOfPages)
             val stripper = PDFTextStripper()
             assertEquals(listOf("Gamma", "Alpha", "Gamma"), (1..3).map { n ->
-                stripper.startPage = n; stripper.endPage = n; stripper.getText(doc).trim()
+                stripper.startPage = n; stripper.endPage = n; stripper.getText(doc).filterNot { it.isWhitespace() }
             })
             assertEquals(listOf(90, 0, 180), (0..2).map { doc.getPage(it).rotation })
             assertEquals(360f, doc.getPage(0).cropBox.width, 0.1f)
