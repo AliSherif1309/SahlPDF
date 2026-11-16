@@ -37,6 +37,7 @@ jobs:
           PUSH_BASE: ${{ github.event.before }}
         run: |
           python3 -m unittest discover -s tools -p 'test_versions.py'
+          python3 -m unittest discover -s tools -p 'test_update_manifest.py'
           if [ "$EVENT" = pull_request ]; then
             python3 tools/check_versions.py --base "$PR_BASE"
           elif [ "$EVENT" = push ]; then
@@ -113,6 +114,8 @@ jobs:
             cp app/build/outputs/apk/release/*universal*.apk out/SahlPDF.apk
             cp app/build/outputs/apk/release/*armeabi-v7a*.apk out/SahlPDF-armeabi-v7a.apk || true
             cp app/build/outputs/apk/release/*arm64-v8a*.apk out/SahlPDF-arm64-v8a.apk || true
+            cp app/build/outputs/apk/release/*x86-*.apk out/SahlPDF-x86.apk || true
+            cp app/build/outputs/apk/release/*x86_64*.apk out/SahlPDF-x86_64.apk || true
             echo "SIGNED=1" >> $GITHUB_ENV
           else
             echo "::warning::Signing secrets are not set in this repository yet: building a TEST version (debug key). Add the 4 SIGNING_* secrets to get the real release."
@@ -120,6 +123,12 @@ jobs:
             cp app/build/outputs/apk/debug/*.apk out/SahlPDF-test.apk
           fi
           ls -la out
+      - name: Verify updater metadata against the built APKs
+        if: env.SIGNED == '1'
+        run: |
+          VERSION=$(python3 tools/check_versions.py --print-version)
+          export VERSION
+          python3 tools/update_manifest.py --directory out --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt"
       - uses: actions/upload-artifact@v4
         with:
           name: SahlPDF
@@ -132,15 +141,6 @@ jobs:
           set -euo pipefail
           VERSION=$(python3 tools/check_versions.py --print-version)
           export VERSION
-          python3 - <<'PY'
-          import json, os, subprocess
-          json.dump({
-              'code': 1000 + int(os.environ['GITHUB_RUN_NUMBER']),
-              'sahlpdf': os.environ['VERSION'],
-              'engine': os.environ.get('ENGINE', ''),
-              'notes': subprocess.check_output(['git', 'log', '-1', '--format=%s'], text=True).strip()
-          }, open('out/version.json', 'w'))
-          PY
           (cd out && sha256sum *.apk > SHA256SUMS)
           TAG="build-$GITHUB_RUN_NUMBER"
           NOTES="Sahl PDF $VERSION · build $GITHUB_RUN_NUMBER ($GITHUB_SHA). For Mi TV use SahlPDF-armeabi-v7a.apk or the universal SahlPDF.apk. PDF engine: $ENGINE. Based on MJ PDF 3.1.0 by Mudlej (GPLv3)."

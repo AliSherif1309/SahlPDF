@@ -66,6 +66,8 @@ class SettingsActivity : AppCompatActivity(), SettingsFragment.Navigation {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.settings_menu, menu)
+        menu.add(Menu.NONE, R.id.update_check, Menu.NONE, R.string.update_check)
+            .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
         menu.tintIconsForChrome(this)
         searchItem = menu.findItem(R.id.searchSettingsOption)
         configureSearch(searchItem)
@@ -85,6 +87,7 @@ class SettingsActivity : AppCompatActivity(), SettingsFragment.Navigation {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.update_check -> startActivity(android.content.Intent(this, com.gitlab.mudlej.MjPdfReader.update.UpdateActivity::class.java))
             android.R.id.home -> if (currentPage == null) finish() else showRoot(reverse = true)
             else -> super.onOptionsItemSelected(item)
         }

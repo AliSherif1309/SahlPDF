@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="update_title">App updates</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_available">Sahl PDF %1$s is available</string>
+    <string name="update_banner_action">Update</string>
+    <string name="update_installed">Installed version: %1$s</string>
+    <string name="update_checking">Checking GitHub releases…</string>
+    <string name="update_current">No newer compatible release is available.</string>
+    <string name="update_downloading">Downloading update… %1$d%%</string>
+    <string name="update_ready">Update verified. Tap Install to continue.</string>
+    <string name="update_failed">Could not check, download, or verify the update. Check your connection and storage, then retry. Only APKs signed with the same key as your installed app can update it.</string>
+    <string name="update_details">Version %1$s · about %2$d MB</string>
+    <string name="update_download">Download update</string>
+    <string name="update_install">Install update</string>
+    <string name="update_permission">Allow Sahl PDF to install apps on the Android settings screen, then return and tap Install again.</string>
+    <string name="update_automatic">Check on launch (once a day)</string>
+    <string name="update_explanation">Checks use the public Sahl PDF GitHub releases. Your documents are never uploaded. APKs download only when you choose. Leaving this screen cancels an unfinished download; tap Download to retry. Android asks you to approve installation. Your library and settings stay in place.</string>
+    <item name="update_status" type="id" />
+    <item name="update_progress" type="id" />
+    <item name="update_action" type="id" />
+    <item name="update_check" type="id" />
+    <item name="update_automatic" type="id" />
+</resources>

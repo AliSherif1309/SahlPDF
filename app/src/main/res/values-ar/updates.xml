@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_title">تحديثات التطبيق</string>
+    <string name="update_check">التحقق من التحديثات</string>
+    <string name="update_available">يتوفر Sahl PDF بالإصدار %1$s</string>
+    <string name="update_banner_action">تحديث</string>
+    <string name="update_installed">الإصدار المثبت: %1$s</string>
+    <string name="update_checking">جارٍ التحقق من إصدارات GitHub…</string>
+    <string name="update_current">لا يتوفر إصدار أحدث متوافق مع جهازك.</string>
+    <string name="update_downloading">جارٍ تنزيل التحديث… %1$d%%</string>
+    <string name="update_ready">تم التحقق من التحديث. اضغط على تثبيت للمتابعة.</string>
+    <string name="update_failed">تعذر التحقق من التحديث أو تنزيله أو التحقق من سلامته. تحقق من الاتصال والمساحة ثم أعد المحاولة. يلزم أن يكون التحديث موقعًا بالمفتاح نفسه المستخدم في نسختك المثبتة.</string>
+    <string name="update_details">الإصدار %1$s · نحو %2$d ميغابايت</string>
+    <string name="update_download">تنزيل التحديث</string>
+    <string name="update_install">تثبيت التحديث</string>
+    <string name="update_permission">اسمح لتطبيق Sahl PDF بتثبيت التطبيقات من شاشة إعدادات أندرويد، ثم عد واضغط على تثبيت مجددًا.</string>
+    <string name="update_automatic">التحقق عند فتح التطبيق (مرة يوميًا)</string>
+    <string name="update_explanation">يستخدم التحقق إصدارات Sahl PDF العامة على GitHub. لا تُرفع مستنداتك. لا يُنزل التحديث إلا باختيارك. تغادر هذه الشاشة فتُلغى أي عملية تنزيل غير مكتملة؛ اضغط على تنزيل لإعادة المحاولة. يطلب أندرويد موافقتك على التثبيت. تبقى مكتبتك وإعداداتك محفوظة.</string>
+</resources>
