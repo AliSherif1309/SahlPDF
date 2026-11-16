@@ -84,7 +84,7 @@ class PageManagerActivity : AppCompatActivity() {
             confirmDiscard { picker.launch(arrayOf("application/pdf")) }
         }
         undo = action(documents, R.string.page_manager_undo, R.id.page_manager_undo) { model.undo() }
-        val selection = row()
+        val selection = documents
         all = action(selection, R.string.page_manager_all, R.id.page_manager_all) { model.selectAll() }
         none = action(selection, R.string.page_manager_none, R.id.page_manager_none) { model.selectNone() }
         val actions = row()
@@ -153,6 +153,8 @@ class PageManagerActivity : AppCompatActivity() {
                     save.isEnabled = ready
                     progress.visibility = if (state.busy) View.VISIBLE else View.GONE
                     counter.text = getString(R.string.page_manager_count, count, selected)
+                    status.maxLines = if (plan == null) 5 else 2
+                    status.ellipsize = android.text.TextUtils.TruncateAt.END
                     status.text = getString(when {
                         state.busy -> R.string.pdf_tools_working
                         state.message == PageManagerState.Message.FAILED -> R.string.page_manager_failed
