@@ -70,6 +70,12 @@ class PdfToolsActivity : AppCompatActivity() {
                 startActivity(android.content.Intent(this@PdfToolsActivity, PageManagerActivity::class.java))
             }
         })
+        content.addView(MaterialButton(this).apply {
+            setText(R.string.scanner_title)
+            setOnClickListener {
+                startActivity(android.content.Intent(this@PdfToolsActivity, com.gitlab.mudlej.MjPdfReader.scanner.ScannerActivity::class.java))
+            }
+        })
         val titles = listOf(R.string.pdf_tools_merge, R.string.pdf_tools_pages, R.string.pdf_tools_images)
         PdfTool.entries.forEachIndexed { index, tool ->
             val button = MaterialButton(this).apply {

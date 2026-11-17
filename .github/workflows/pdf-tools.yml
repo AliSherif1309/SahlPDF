@@ -25,19 +25,37 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install compile SDK
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
           echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - name: Restore native reader for scanner integration tests
+        id: native
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            PdfiumAndroid/src/main/jni/lib
+            PdfiumAndroid/src/main/libs
+          key: native-src-v1-${{ hashFiles('build_dependencies/**', 'build_dependencies.py', 'PdfiumAndroid/src/main/jni/**/*.c*', 'PdfiumAndroid/src/main/jni/**/*.h', 'PdfiumAndroid/src/main/jni/**/*.mk', 'PdfiumAndroid/src/main/jni/**/CMakeLists.txt') }}
+      - name: Build native test fallback when cache is unavailable
+        if: steps.native.outputs.cache-hit != 'true'
+        run: |
+          pip install requests
+          ANDROID_NDK="$ANDROID_NDK_LATEST_HOME" python3 build_dependencies.py --pdfium prebuilt --abi all
       - name: Unit tests and lint
         run: |
           chmod +x gradlew
-          ./gradlew :app:testDebugUnitTest --tests '*PageSelectionTest' --tests '*PagePlanTest' --tests '*UpdatePolicyTest' --no-daemon
-          if ! ./gradlew :app:lintDebug --no-daemon; then
+          ./gradlew :app:testDebugUnitTest --tests '*PageSelectionTest' --tests '*PagePlanTest' --tests '*UpdatePolicyTest' --tests '*ScanGeometryTest' --no-daemon -Dorg.gradle.jvmargs=-Xmx2048m -Pkotlin.compiler.execution.strategy=in-process
+          if ! ./gradlew :app:lintDebug --no-daemon -Dorg.gradle.jvmargs=-Xmx2048m -Pkotlin.compiler.execution.strategy=in-process; then
             python3 -c 'import xml.etree.ElementTree as E; r=E.parse("app/build/reports/lint-results-debug.xml"); [print(E.tostring(i, encoding="unicode")) for i in r.findall("issue") if i.get("severity") in ("Error","Fatal")]'
             exit 1
           fi
+      - name: Compile test APKs before starting the emulator
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon -Dorg.gradle.jvmargs=-Xmx2048m -Pkotlin.compiler.execution.strategy=in-process
       - name: Enable emulator acceleration
         if: ${{ !cancelled() }}
         run: |
@@ -50,8 +68,19 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
+          cores: 2
+          ram-size: 2048M
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsEngineTest,com.gitlab.mudlej.MjPdfReader.ui.tools.PageManagerTest,com.gitlab.mudlej.MjPdfReader.update.UpdateRepositoryTest --no-daemon
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front none
+          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.gitlab.mudlej.MjPdfReader.ui.tools.PdfToolsEngineTest,com.gitlab.mudlej.MjPdfReader.ui.tools.PageManagerTest,com.gitlab.mudlej.MjPdfReader.update.UpdateRepositoryTest,com.gitlab.mudlej.MjPdfReader.scanner.ScannerProcessorTest,com.gitlab.mudlej.MjPdfReader.scanner.ScannerWorkflowTest --no-daemon -Dorg.gradle.jvmargs=-Xmx2048m -Pkotlin.compiler.execution.strategy=in-process
+      - name: Capture emulator failure diagnostics
+        if: failure()
+        run: |
+          mkdir -p app/build/reports/emulator
+          free -m > app/build/reports/emulator/host-memory.txt
+          adb devices -l > app/build/reports/emulator/devices.txt 2>&1 || true
+          adb logcat -d > app/build/reports/emulator/logcat.txt 2>&1 || true
+          dmesg -T > app/build/reports/emulator/kernel.txt 2>&1 || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

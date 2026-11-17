@@ -2,11 +2,13 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="sahl-scanner.xml" />
         <include domain="database" path="app-db.db" />
         <include domain="database" path="app-db.db-wal" />
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="sahl-scanner.xml" />
         <include domain="database" path="app-db.db" />
         <include domain="database" path="app-db.db-wal" />
         <include domain="file" path="annotations" />

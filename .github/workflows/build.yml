@@ -123,6 +123,8 @@ jobs:
             cp app/build/outputs/apk/debug/*.apk out/SahlPDF-test.apk
           fi
           ls -la out
+      - name: Verify scanner and reader use the same native runtime
+        run: python3 tools/check_scanner_runtime.py
       - name: Verify updater metadata against the built APKs
         if: env.SIGNED == '1'
         run: |

@@ -64,3 +64,6 @@
 
 # PDFBox optional JPEG 2000 decoder is not bundled; page imports preserve its compressed bytes.
 -dontwarn com.gemalto.jp2.**
+
+# Preserve JNI entry points in the bundled offline image processor.
+-keep class org.opencv.** { *; }
