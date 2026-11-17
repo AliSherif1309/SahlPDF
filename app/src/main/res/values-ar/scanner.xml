@@ -28,4 +28,6 @@
     <string name="scanner_camera_failed">تعذر تشغيل الكاميرا أو التقاط الصورة. أعد المحاولة أو عد لاستيراد صورة.</string>
     <string name="scanner_light">إضاءة</string>
     <string name="scanner_shutter">التقاط</string>
+    <string name="scanner_empty_title">ابدأ بمسح أول صفحة</string>
+    <string name="scanner_empty_help">اضغط إضافة صورة لفتح الكاميرا، أو استيراد صورة لاختيار صورة موجودة. بعد إضافة الصفحة، اضبط زواياها وعاين النتيجة. تبقى المسودة على هذا الجهاز؛ احفظ PDF للاحتفاظ بنسخة مستقلة.</string>
 </resources>
