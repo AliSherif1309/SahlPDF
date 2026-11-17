@@ -38,4 +38,7 @@
     <item name="scanner_status" type="id" />
     <item name="scanner_save" type="id" />
     <item name="scanner_shutter" type="id" />
+    <string name="scanner_empty_title">Scan your first page</string>
+    <string name="scanner_empty_help">Tap Add photo to open the camera, or Import image to use an existing photo. After adding a page, adjust its corners and preview the result. Your draft stays on this device; save a PDF to keep a separate copy.</string>
+    <item name="scanner_empty" type="id" />
 </resources>

@@ -53,7 +53,7 @@ android {
         compileSdkVersion 36
         targetSdkVersion 36
         versionCode 1000 + (System.getenv("GITHUB_RUN_NUMBER")?.toInteger() ?: 0)
-        versionName "1.6.0"
+        versionName "1.6.1"
         multiDexEnabled = true
         vectorDrawables.useSupportLibrary = true
 

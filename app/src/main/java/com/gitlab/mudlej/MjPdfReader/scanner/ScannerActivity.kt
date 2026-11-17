@@ -30,6 +30,8 @@ import kotlinx.coroutines.launch
 
 class ScannerActivity : AppCompatActivity() {
     private val model: ScannerViewModel by viewModels()
+    private lateinit var empty: LinearLayout
+    private lateinit var editor: LinearLayout
     private lateinit var crop: ScanCropView
     private lateinit var adapter: ScanStripAdapter
     private lateinit var status: TextView
@@ -69,31 +71,54 @@ class ScannerActivity : AppCompatActivity() {
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(android.widget.ScrollView(this).apply { isFillViewport = true; addView(content) },
             LinearLayout.LayoutParams(-1, 0, 1f))
-        fun row(): LinearLayout {
+        fun row(parent: LinearLayout = content): LinearLayout {
             val inner = LinearLayout(this).apply { setPadding(dp(8), 0, dp(8), 0) }
-            content.addView(HorizontalScrollView(this).apply { addView(inner) })
+            parent.addView(HorizontalScrollView(this).apply { addView(inner) })
             return inner
         }
         fun button(row: LinearLayout, label: Int, idValue: Int = View.NO_ID, callback: () -> Unit): MaterialButton =
             MaterialButton(this).apply { id = idValue; setText(label); setOnClickListener { callback() }; row.addView(this) }
-        val intake = row()
+        empty = LinearLayout(this).apply {
+            id = R.id.scanner_empty
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(32), dp(24), dp(24))
+            addView(TextView(this@ScannerActivity).apply {
+                setText(R.string.scanner_empty_title)
+                textSize = 24f
+                setPadding(0, 0, 0, dp(12))
+            })
+            addView(TextView(this@ScannerActivity).apply {
+                setText(R.string.scanner_empty_help)
+                textSize = 16f
+            })
+        }
+        content.addView(empty)
+        val intake = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), 0, dp(16), 0)
+        }
+        content.addView(intake)
         capture = button(intake, R.string.scanner_capture, R.id.scanner_capture) { capture(false) }
         gallery = button(intake, R.string.scanner_import, R.id.scanner_import) { picker.launch(arrayOf("image/*")) }
-        fresh = button(intake, R.string.scanner_new, R.id.scanner_new) {
+        listOf(capture, gallery).forEach { it.layoutParams = LinearLayout.LayoutParams(-1, -2) }
+        val draftActions = row()
+        fresh = button(draftActions, R.string.scanner_new, R.id.scanner_new) {
             MaterialAlertDialogBuilder(this).setMessage(R.string.scanner_new_confirm)
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(R.string.scanner_new) { _, _ -> model.newDraft() }.show()
         }
-        undo = button(intake, R.string.page_manager_undo, R.id.scanner_undo) { model.undo() }
+        undo = button(draftActions, R.string.page_manager_undo, R.id.scanner_undo) { model.undo() }
+        editor = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        content.addView(editor)
         adapter = ScanStripAdapter(model, lifecycleScope)
-        content.addView(RecyclerView(this).apply {
+        editor.addView(RecyclerView(this).apply {
             id = R.id.scanner_pages
             layoutManager = LinearLayoutManager(this@ScannerActivity, RecyclerView.HORIZONTAL, false)
             adapter = this@ScannerActivity.adapter
             itemAnimator = null
         }, LinearLayout.LayoutParams(-1, dp(112)))
         counter = TextView(this).apply { setPadding(dp(16), 0, dp(16), 0) }
-        content.addView(counter)
+        editor.addView(counter)
         crop = ScanCropView(this).apply {
             id = R.id.scanner_crop
             onCornersChanged = model::corners
@@ -102,8 +127,8 @@ class ScannerActivity : AppCompatActivity() {
         val cropHeight = if (configuration.screenWidthDp > configuration.screenHeightDp)
             (configuration.screenHeightDp - 200).coerceAtLeast(160)
         else (configuration.screenWidthDp * 1.1f).toInt().coerceIn(280, 440)
-        content.addView(crop, LinearLayout.LayoutParams(-1, dp(cropHeight)))
-        val actions = row()
+        editor.addView(crop, LinearLayout.LayoutParams(-1, dp(cropHeight)))
+        val actions = row(editor)
         pageActions += button(actions, R.string.scanner_preview, R.id.scanner_preview) { preview() }
         pageActions += button(actions, R.string.scanner_retake) { capture(true) }
         pageActions += button(actions, R.string.scanner_full_page) { model.corners(ScanGeometry.fullPage()) }
@@ -115,7 +140,7 @@ class ScannerActivity : AppCompatActivity() {
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(R.string.page_manager_delete) { _, _ -> model.delete() }.show()
         }
-        val filterRow = row()
+        val filterRow = row(editor)
         val labels = listOf(R.string.scanner_natural, R.string.scanner_gray, R.string.scanner_mono)
         ScanFilter.entries.forEachIndexed { index, filter ->
             filters += button(filterRow, labels[index]) { model.filter(filter); render(model.state.value) }.apply { isCheckable = true }
@@ -123,8 +148,7 @@ class ScannerActivity : AppCompatActivity() {
         status = TextView(this).apply {
             id = R.id.scanner_status
             setPadding(dp(16), dp(2), dp(16), dp(2))
-            maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
+            // Keep operation errors and guidance readable, including with large fonts.
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         root.addView(status)
@@ -154,6 +178,12 @@ class ScannerActivity : AppCompatActivity() {
     private fun render(state: ScannerState) {
         val draft = state.draft
         val page = draft?.selectedPage()
+        empty.visibility = if (page == null && !state.busy) View.VISIBLE else View.GONE
+        editor.visibility = if (page != null) View.VISIBLE else View.GONE
+        fresh.visibility = if (page != null || state.message == ScannerState.Message.FAILED) View.VISIBLE else View.GONE
+        undo.visibility = if (state.canUndo) View.VISIBLE else View.GONE
+        save.visibility = if (page != null) View.VISIBLE else View.GONE
+        status.visibility = if (page == null && !state.busy && state.message == null) View.GONE else View.VISIBLE
         capture.isEnabled = !state.busy && draft != null && draft.pages.size < ScanStore.MAX_PAGES
         gallery.isEnabled = capture.isEnabled
         fresh.isEnabled = !state.busy

@@ -73,9 +73,23 @@ class ScannerWorkflowTest {
                 lateinit var model: ScannerViewModel
                 scenario.onActivity { model = ViewModelProvider(it)[ScannerViewModel::class.java] }
                 waitFor { !model.state.value.busy }
-                scenario.onActivity { model.import(Uri.fromFile(input)) }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                scenario.onActivity {
+                    assertTrue(it.findViewById<android.view.View>(R.id.scanner_empty).isShown)
+                    assertFalse(it.findViewById<android.view.View>(R.id.scanner_crop).isShown)
+                    assertFalse(it.findViewById<android.view.View>(R.id.scanner_save).isShown)
+                    assertTrue(it.findViewById<android.view.View>(R.id.scanner_capture).isEnabled)
+                    assertTrue(it.findViewById<android.view.View>(R.id.scanner_import).isEnabled)
+                    model.import(Uri.fromFile(input))
+                }
                 waitFor { !model.state.value.busy }
                 assertEquals(1, model.state.value.draft!!.pages.size)
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                scenario.onActivity {
+                    assertFalse(it.findViewById<android.view.View>(R.id.scanner_empty).isShown)
+                    assertTrue(it.findViewById<android.view.View>(R.id.scanner_crop).isShown)
+                    assertTrue(it.findViewById<android.view.View>(R.id.scanner_save).isShown)
+                }
                 scenario.onActivity { model.rotate(); model.filter(ScanFilter.GRAY) }
                 scenario.recreate()
                 scenario.onActivity {
