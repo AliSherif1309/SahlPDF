@@ -19,6 +19,10 @@ class UpdateBannerController(
     private val text: TextView,
     private val button: MaterialButton,
 ) {
+    companion object {
+        private var promptedThisRun = false
+    }
+
     private var job: Job? = null
     init {
         button.setOnClickListener { activity.startActivity(Intent(activity, UpdateActivity::class.java)) }
@@ -43,5 +47,16 @@ class UpdateBannerController(
     private fun show(update: AppUpdate?) {
         banner.visibility = if (update == null) View.GONE else View.VISIBLE
         text.text = update?.let { activity.getString(R.string.update_available, it.version) }.orEmpty()
+        if (update != null && !promptedThisRun && !activity.isFinishing && !activity.isDestroyed) {
+            promptedThisRun = true
+            androidx.appcompat.app.AlertDialog.Builder(activity)
+                .setTitle(activity.getString(R.string.update_available, update.version))
+                .setMessage(activity.getString(R.string.update_details, update.version, (update.size / (1024 * 1024)).coerceAtLeast(1)))
+                .setPositiveButton(R.string.update_install) { _, _ ->
+                    activity.startActivity(Intent(activity, UpdateActivity::class.java))
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
     }
 }
