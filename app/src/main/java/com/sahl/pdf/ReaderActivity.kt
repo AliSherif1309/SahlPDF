@@ -423,6 +423,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         pdfView.setDocument(d, start)
         pdfView.setAnnotations(Library.annotations(this, key))
         pdfView.setInks(Library.inks(this, key))
+        pdfView.setShapes(Library.shapes(this, key))
         updateLabel(start)
         Library.upsert(this, Book(key, uri.toString(), name, size, d.pageCount, start, System.currentTimeMillis()))
         val thumb = Library.thumb(this, key)
@@ -629,6 +630,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
             isChecked = pdfView.cropMargins
         }
         m.menu.add(0, 6, 0, R.string.doc_info)
+        m.menu.add(0, 12, 0, R.string.save_annotated)
         if (uri.scheme == "content") {
             m.menu.add(0, 7, 0, R.string.share)
             m.menu.add(0, 8, 0, R.string.open_with)
@@ -653,10 +655,44 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 9 -> startActivity(Intent(this, SettingsActivity::class.java))
                 10 -> toggleTwoPage()
                 11 -> showAnnotations()
+                12 -> startExportAnnotated()
             }
             true
         }
         m.show()
+    }
+
+    private fun startExportAnnotated() {
+        val base = name.removeSuffix(".pdf").removeSuffix(".PDF")
+        val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/pdf")
+            .putExtra(Intent.EXTRA_TITLE, "$base-annotated.pdf")
+        try { startActivityForResult(i, 44) } catch (_: Exception) {
+            Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != 44 || resultCode != RESULT_OK) return
+        val outUri = data?.data ?: return
+        val d = doc ?: return
+        val anns = Library.annotations(this, key)
+        val inks = Library.inks(this, key)
+        val shapes = Library.shapes(this, key)
+        Toast.makeText(this, R.string.saving_pdf, Toast.LENGTH_SHORT).show()
+        progress.visibility = View.VISIBLE
+        renderer.call({
+            contentResolver.openOutputStream(outUri)?.use { os ->
+                PdfExporter.export(d, anns, inks, shapes, os)
+            } ?: error("Cannot write")
+        }) { r ->
+            progress.visibility = View.GONE
+            r.onSuccess { Toast.makeText(this, R.string.saved_pdf, Toast.LENGTH_SHORT).show() }
+            r.onFailure { Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show() }
+        }
     }
 
     private fun showTvMenu() {
@@ -1010,8 +1046,12 @@ class ReaderActivity : Activity(), PdfView.Listener {
         val lp = { LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) } }
         toolsRow.addView(toolBtn(PdfView.ToolMode.PEN, R.string.pen), lp())
         toolsRow.addView(toolBtn(PdfView.ToolMode.MARKER, R.string.marker), lp())
-        toolsRow.addView(toolBtn(PdfView.ToolMode.ERASER, R.string.eraser), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.RECT, R.string.shape_rect), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.CIRCLE, R.string.shape_circle), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.ARROW, R.string.shape_arrow), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.TEXT, R.string.free_text), lp())
         toolsRow.addView(toolBtn(PdfView.ToolMode.STICKY, R.string.sticky_note), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.ERASER, R.string.eraser), lp())
 
         toolsRow.addView(TextView(this).apply {
             text = getString(R.string.undo)
@@ -1077,6 +1117,41 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 pdfView.setAnnotations(Library.annotations(this, key))
             }
             toggleAnnotateBar(forceClose = true)
+        }
+    }
+
+    override fun onShapeAdded(page: Int, kind: String, x1: Float, y1: Float, x2: Float, y2: Float, color: Int, width: Float) {
+        Library.addShape(this, key, page, kind, x1, y1, x2, y2, color, width)
+        pdfView.setShapes(Library.shapes(this, key))
+    }
+
+    override fun onShapeErased(id: String) {
+        pdfView.setShapes(Library.removeShape(this, key, id))
+    }
+
+    override fun onTextTap(page: Int, nx: Float, ny: Float) {
+        showNoteEditor(R.string.free_text, "", "") { text ->
+            if (text.isNotBlank()) {
+                Library.addShape(
+                    this, key, page, "text",
+                    nx, ny, (nx + 0.25f).coerceAtMost(1f), (ny + 0.06f).coerceAtMost(1f),
+                    pdfView.penColor, pdfView.penWidth, text,
+                )
+                pdfView.setShapes(Library.shapes(this, key))
+            }
+            toggleAnnotateBar(forceClose = true)
+        }
+    }
+
+    override fun onShapeTap(entry: Library.ShapeEntry) {
+        if (entry.kind == "text") {
+            showNoteEditor(R.string.free_text, "", entry.text) { updated ->
+                if (updated.isBlank()) {
+                    pdfView.setShapes(Library.removeShape(this, key, entry.id))
+                } else {
+                    pdfView.setShapes(Library.updateShapeText(this, key, entry.id, updated))
+                }
+            }
         }
     }
 

@@ -31,7 +31,7 @@ import kotlin.math.roundToInt
 @SuppressLint("ViewConstructor")
 class PdfView(context: Context, private val renderer: Renderer) : View(context) {
 
-    enum class ToolMode { NONE, PEN, MARKER, ERASER, STICKY }
+    enum class ToolMode { NONE, PEN, MARKER, RECT, CIRCLE, ARROW, TEXT, ERASER, STICKY }
 
     interface Listener {
         fun onPageChanged(page: Int, count: Int)
@@ -42,6 +42,10 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         fun onInkAdded(page: Int, color: Int, width: Float, points: List<Float>)
         fun onInkErased(id: String)
         fun onStickyTap(page: Int, nx: Float, ny: Float)
+        fun onShapeAdded(page: Int, kind: String, x1: Float, y1: Float, x2: Float, y2: Float, color: Int, width: Float)
+        fun onShapeErased(id: String)
+        fun onTextTap(page: Int, nx: Float, ny: Float)
+        fun onShapeTap(entry: Library.ShapeEntry)
     }
 
     var listener: Listener? = null
@@ -95,12 +99,15 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private var activeHitIndex = -1
     private var annotations: List<Library.AnnotationEntry> = emptyList()
     private var inks: List<Library.InkStroke> = emptyList()
+    private var shapes: List<Library.ShapeEntry> = emptyList()
     var selection: TextSelection? = null; private set
     var toolMode = ToolMode.NONE
     var penColor: Int = 0xFF0E6B4E.toInt()
     var penWidth: Float = 0.004f
     private var activeInkPage = -1
     private val activeInkPts = ArrayList<Float>()
+    private var activeShapePage = -1
+    private var shapeX1 = 0f; private var shapeY1 = 0f; private var shapeX2 = 0f; private var shapeY2 = 0f
     private val linksCache = HashMap<Int, List<PageLink>>()
     private val linksPending = HashSet<Int>()
 
@@ -119,13 +126,7 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private val shadow = Paint().apply { color = 0x22000000 }
     private val hitPaint = Paint().apply { color = 0x55F5C84C }
     private val activeHitPaint = Paint().apply { color = 0x99F5C84C.toInt() }
-    private val annPaint = Paint()
-    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
-    }
-    private val inkPath = android.graphics.Path()
-    private val noteDotPaint = Paint().apply { color = 0xFFF5C84C.toInt() }
+    private val overlay = AnnotationDraw(dp)
     private val selPaint = Paint().apply { color = 0x66F5C84C }
     private val handleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF0E6B4E.toInt() }
     private val handleStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -177,6 +178,11 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
 
     fun setInks(list: List<Library.InkStroke>) {
         inks = list
+        invalidate()
+    }
+
+    fun setShapes(list: List<Library.ShapeEntry>) {
+        shapes = list
         invalidate()
     }
 
@@ -362,116 +368,33 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         requestRenders(visiblePages)
     }
 
-    private fun drawNormRects(
-        canvas: Canvas,
-        pageIdx: Int,
-        pageDst: RectF,
-        rects: List<NormRect>,
-        paint: Paint,
-        dot: Boolean = false,
-        style: String = "highlight",
-    ) {
-        val crop = cropFor(pageIdx)
-        val cw = max(0.05f, crop.width)
-        val ch = max(0.05f, crop.height)
-        for (idx in rects.indices) {
-            val nr = rects[idx]
-            val rl = ((nr.left - crop.left) / cw).coerceIn(0f, 1f)
-            val rt = ((nr.top - crop.top) / ch).coerceIn(0f, 1f)
-            val rr = ((nr.right - crop.left) / cw).coerceIn(0f, 1f)
-            val rb = ((nr.bottom - crop.top) / ch).coerceIn(0f, 1f)
-            if (rr <= rl || rb <= rt) continue
-            val l = pageDst.left + rl * pageDst.width()
-            val t = pageDst.top + rt * pageDst.height()
-            val r = pageDst.left + rr * pageDst.width()
-            val b = pageDst.top + rb * pageDst.height()
-            when (style) {
-                "underline" -> {
-                    linePaint.color = paint.color or 0xFF000000.toInt()
-                    linePaint.strokeWidth = 2.2f * dp
-                    canvas.drawLine(l, b, r, b, linePaint)
-                }
-                "strikeout" -> {
-                    linePaint.color = paint.color or 0xFF000000.toInt()
-                    linePaint.strokeWidth = 2.2f * dp
-                    val mid = (t + b) / 2f
-                    canvas.drawLine(l, mid, r, mid, linePaint)
-                }
-                "squiggly" -> {
-                    linePaint.color = paint.color or 0xFF000000.toInt()
-                    linePaint.strokeWidth = 1.8f * dp
-                    inkPath.reset()
-                    inkPath.moveTo(l, b)
-                    val step = 5f * dp
-                    var x = l
-                    var up = true
-                    while (x < r) {
-                        val nx = min(r, x + step)
-                        inkPath.lineTo(nx, if (up) b - 2.5f * dp else b + 1f * dp)
-                        x = nx; up = !up
-                    }
-                    canvas.drawPath(inkPath, linePaint)
-                }
-                "sticky" -> {
-                    val sz = 18f * dp
-                    annPaint.color = paint.color or 0xFF000000.toInt()
-                    canvas.drawRoundRect(l, t, l + sz, t + sz, 4f * dp, 4f * dp, annPaint)
-                    linePaint.color = Color.WHITE; linePaint.strokeWidth = 1.5f * dp
-                    canvas.drawLine(l + 4f * dp, t + 6f * dp, l + sz - 4f * dp, t + 6f * dp, linePaint)
-                    canvas.drawLine(l + 4f * dp, t + 10f * dp, l + sz - 4f * dp, t + 10f * dp, linePaint)
-                    canvas.drawLine(l + 4f * dp, t + 14f * dp, l + sz - 7f * dp, t + 14f * dp, linePaint)
-                }
-                else -> canvas.drawRect(l, t, r, b, paint)
-            }
-            if (dot && idx == 0 && style != "sticky") canvas.drawCircle(r, t, 4 * dp, noteDotPaint)
-        }
-    }
-
-    private fun drawInkStroke(canvas: Canvas, pageIdx: Int, pageDst: RectF, color: Int, normW: Float, pts: List<Float>) {
-        if (pts.size < 2) return
-        val crop = cropFor(pageIdx)
-        val cw = max(0.05f, crop.width)
-        val ch = max(0.05f, crop.height)
-        val fullW = pageDst.width() / cw
-        inkPaint.color = color
-        inkPaint.strokeWidth = max(1.5f, normW * fullW)
-        inkPath.reset()
-        for (k in 0 until pts.size - 1 step 2) {
-            val sx = pageDst.left + ((pts[k] - crop.left) / cw) * pageDst.width()
-            val sy = pageDst.top + ((pts[k + 1] - crop.top) / ch) * pageDst.height()
-            if (k == 0) inkPath.moveTo(sx, sy) else inkPath.lineTo(sx, sy)
-        }
-        if (pts.size == 2) canvas.drawPoint(
-            pageDst.left + ((pts[0] - crop.left) / cw) * pageDst.width(),
-            pageDst.top + ((pts[1] - crop.top) / ch) * pageDst.height(),
-            inkPaint,
-        ) else canvas.drawPath(inkPath, inkPaint)
-    }
-
     private fun drawHighlights(canvas: Canvas, pageIdx: Int, pageDst: RectF) {
-        for (a in annotations) {
-            if (a.page == pageIdx) {
-                annPaint.color = a.color
-                drawNormRects(canvas, pageIdx, pageDst, a.rects, annPaint, dot = a.note.isNotBlank(), style = a.style)
-            }
-        }
-        for (s in inks) {
-            if (s.page == pageIdx) drawInkStroke(canvas, pageIdx, pageDst, s.color, s.width, s.points)
-        }
+        val crop = cropFor(pageIdx)
+        overlay.drawPageOverlays(canvas, pageIdx, pageDst, crop, annotations, inks, shapes)
         if (activeInkPage == pageIdx && activeInkPts.isNotEmpty()) {
             val c = if (toolMode == ToolMode.MARKER) (penColor and 0x00FFFFFF) or 0x55000000 else penColor
             val w = if (toolMode == ToolMode.MARKER) penWidth * 3.2f else penWidth
-            drawInkStroke(canvas, pageIdx, pageDst, c, w, activeInkPts)
+            overlay.drawInk(canvas, pageDst, crop, c, w, activeInkPts)
+        }
+        if (activeShapePage == pageIdx) {
+            val kind = when (toolMode) {
+                ToolMode.RECT -> "rect"
+                ToolMode.CIRCLE -> "circle"
+                ToolMode.ARROW -> "arrow"
+                else -> ""
+            }
+            if (kind.isNotEmpty()) overlay.drawShape(canvas, pageDst, crop, kind, shapeX1, shapeY1, shapeX2, shapeY2, penColor, penWidth)
         }
         for (idx in searchHits.indices) {
             val hit = searchHits[idx]
             if (hit.page == pageIdx) {
-                drawNormRects(canvas, pageIdx, pageDst, hit.rects, if (idx == activeHitIndex) activeHitPaint else hitPaint)
+                val c = if (idx == activeHitIndex) activeHitPaint.color else hitPaint.color
+                overlay.drawNormRects(canvas, pageDst, crop, hit.rects, c)
             }
         }
         val sel = selection
         if (sel != null && sel.page == pageIdx && sel.rects.isNotEmpty()) {
-            drawNormRects(canvas, pageIdx, pageDst, sel.rects, selPaint)
+            overlay.drawNormRects(canvas, pageDst, crop, sel.rects, selPaint.color)
             val crop = cropFor(pageIdx)
             val cw = max(0.05f, crop.width)
             val ch = max(0.05f, crop.height)
@@ -698,6 +621,20 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
                     listener?.onStickyTap(p, nx, ny)
                     return true
                 }
+                if (toolMode == ToolMode.TEXT) {
+                    listener?.onTextTap(p, nx, ny)
+                    return true
+                }
+                val shapeHit = shapes.firstOrNull { s ->
+                    if (s.page != p) return@firstOrNull false
+                    val l = min(s.x1, s.x2); val r = max(s.x1, s.x2)
+                    val t = min(s.y1, s.y2); val b = max(s.y1, s.y2)
+                    nx >= l - 0.02f && nx <= r + 0.02f && ny >= t - 0.02f && ny <= b + 0.02f
+                }
+                if (shapeHit != null) {
+                    listener?.onShapeTap(shapeHit)
+                    return true
+                }
                 val d = doc
                 val cached = linksCache[p]
                 if (cached != null) {
@@ -748,8 +685,14 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
                 if (dx * dx + dy * dy <= 0.03f * 0.03f) return@firstOrNull true
             }
             false
-        } ?: return
-        listener?.onInkErased(hit.id)
+        }
+        if (hit != null) { listener?.onInkErased(hit.id); return }
+        val sh = shapes.firstOrNull { s ->
+            s.page == page &&
+                nx >= min(s.x1, s.x2) - 0.025f && nx <= max(s.x1, s.x2) + 0.025f &&
+                ny >= min(s.y1, s.y2) - 0.025f && ny <= max(s.y1, s.y2) + 0.025f
+        }
+        if (sh != null) listener?.onShapeErased(sh.id)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -791,6 +734,44 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             } else {
                 activeInkPage = -1
                 activeInkPts.clear()
+            }
+        } else if (toolMode == ToolMode.RECT || toolMode == ToolMode.CIRCLE || toolMode == ToolMode.ARROW) {
+            if (event.pointerCount == 1) {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        val hit = hitTestPage(event.x, event.y)
+                        if (hit != null) {
+                            stopMotion()
+                            activeShapePage = hit.first
+                            shapeX1 = hit.second; shapeY1 = hit.third
+                            shapeX2 = hit.second; shapeY2 = hit.third
+                            invalidate()
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_MOVE -> if (activeShapePage >= 0) {
+                        val hit = hitTestPage(event.x, event.y)
+                        if (hit != null && hit.first == activeShapePage) {
+                            shapeX2 = hit.second; shapeY2 = hit.third
+                            invalidate()
+                        }
+                        return true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (activeShapePage >= 0) {
+                        val p = activeShapePage
+                        activeShapePage = -1
+                        val kind = when (toolMode) {
+                            ToolMode.RECT -> "rect"
+                            ToolMode.CIRCLE -> "circle"
+                            else -> "arrow"
+                        }
+                        listener?.onShapeAdded(p, kind, shapeX1, shapeY1, shapeX2, shapeY2, penColor, penWidth)
+                        invalidate()
+                        return true
+                    }
+                }
+            } else {
+                activeShapePage = -1
             }
         } else if (toolMode == ToolMode.ERASER && event.pointerCount == 1) {
             if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_MOVE) {
