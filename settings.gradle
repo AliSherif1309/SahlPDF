@@ -1,4 +1,0 @@
-include ':AndroidPdfViewer:android-pdf-viewer'
-include ':app'
-include ':PdfiumAndroid'
-include ':macrobenchmark'

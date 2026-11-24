@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:pathData="M56,48h30l18,18v58a6,6 0,0 1,-6 6h-42a6,6 0,0 1,-6 -6v-70a6,6 0,0 1,6 -6z" android:fillColor="#00000000" android:strokeColor="#FFF8E7" android:strokeWidth="6" android:strokeLineJoin="round" />
+    <path android:pathData="M86,48v12a6,6 0,0 0,6 6h12" android:fillColor="#00000000" android:strokeColor="#FFF8E7" android:strokeWidth="6" android:strokeLineJoin="round" />
+    <path android:pathData="M60,82h30M60,96h30M60,110h18" android:strokeColor="#F5C84C" android:strokeWidth="5" android:strokeLineCap="round" />
+    <!-- "PDF" in simple strokes -->
+    <path android:pathData="M140,118v-56h18a14,14 0,0 1,0 28h-18" android:fillColor="#00000000" android:strokeColor="#FFF8E7" android:strokeWidth="8" android:strokeLineJoin="round" android:strokeLineCap="round" />
+    <path android:pathData="M188,62v56h12a28,28 0,0 0,0 -56z" android:fillColor="#00000000" android:strokeColor="#FFF8E7" android:strokeWidth="8" android:strokeLineJoin="round" />
+    <path android:pathData="M260,62h-28v56M232,90h22" android:fillColor="#00000000" android:strokeColor="#F5C84C" android:strokeWidth="8" android:strokeLineJoin="round" android:strokeLineCap="round" />
+</vector>
