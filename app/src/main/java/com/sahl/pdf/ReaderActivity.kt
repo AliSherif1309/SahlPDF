@@ -353,7 +353,8 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 r.getOrNull()?.let { add(getString(R.string.info_title) + ": " + it) }
                 add(getString(R.string.info_file) + ": " + name)
                 add(getString(R.string.info_pages) + ": " + d.pageCount)
-                if (size > 0) add(getString(R.string.info_size) + ": " + Formatter.formatShortFileSize(this@ReaderActivity, size))
+                val bytes = this@ReaderActivity.size
+                if (bytes > 0) add(getString(R.string.info_size) + ": " + Formatter.formatShortFileSize(this@ReaderActivity, bytes))
             }
             AlertDialog.Builder(this)
                 .setTitle(R.string.doc_info)
