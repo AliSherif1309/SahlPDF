@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Written by Mudlej. License is GPLv3. -->
-<paths>
-    <cache-path
-        name="share"
-        path="share/" />
-    <files-path name="updates" path="updates/" />
-</paths>

@@ -1,207 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Written by Mudlej. License is GPLv3. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Sahl PDF: works on TVs (remote, no touch screen) as well as phones -->
-    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Optional: lets the "On this device" list show every PDF (asked for only from that list). -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <permission
+        android:name="com.sahl.permission.UNION"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.sahl.permission.UNION" />
+
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <queries>
-        <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT" />
-            <data android:mimeType="text/plain" />
-        </intent>
+        <package android:name="com.sahl.phone" />
+        <package android:name="com.sahl.contacts" />
+        <package android:name="com.sahl.messages" />
+        <package android:name="com.sahl.camera" />
+        <package android:name="com.sahl.gallery" />
+        <package android:name="com.sahl.files" />
+        <package android:name="com.sahl.adhan" />
+        <package android:name="com.sahl.tools" />
+        <package android:name="com.aly.sahlsync" />
+        <package android:name="com.aly.trueqibla" />
     </queries>
 
     <application
-        android:name="com.gitlab.mudlej.MjPdfReader.App"
-        android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="@string/mj_app_name"
+        android:supportsRtl="true"
         android:largeHeap="true"
         android:requestLegacyExternalStorage="true"
-        android:supportsRtl="true"
-        android:theme="@style/MJ_PDF_THEME"
-        android:usesCleartextTraffic="true">
-        <activity android:name=".scanner.ScannerActivity" android:exported="false" android:theme="@style/HomeTheme" />
-        <activity android:name=".scanner.ScanCameraActivity" android:exported="false" android:theme="@style/HomeTheme" />
-        <activity android:name=".update.UpdateActivity" android:exported="false" android:theme="@style/HomeTheme" />
-        <activity android:name=".ui.tools.PageManagerActivity" android:exported="false" android:theme="@style/HomeTheme" />
-        <activity android:name=".ui.tools.PdfToolsActivity" android:exported="false" android:theme="@style/HomeTheme" />
+        android:theme="@style/Sahl">
+
         <activity
-            android:name=".ui.home.HomeActivity"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:theme="@style/HomeTheme"
-            android:windowSoftInputMode="adjustNothing" />
-        <activity-alias
-            android:name=".Launcher"
+            android:name=".MainActivity"
             android:exported="true"
-            android:targetActivity=".ui.home.HomeActivity">
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-        </activity-alias>
-        <activity
-            android:name=".ui.search.SearchActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.gotopage.GoToPageActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.links.LinksActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.tableofcontents.TableOfContentsActivity"
-            android:exported="false">
-            <meta-data
-                android:name="android.app.lib_name"
-                android:value="" />
         </activity>
+
         <activity
-            android:name=".ui.userbookmarks.UserBookmarksActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.usernotes.UserNotesActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.userhighlights.UserHighlightsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.history.NavigationHistoryActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.home.ScanLocationsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.history.ReadingHistoryActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.text_mode.TextModeActivity"
-            android:exported="false"
-            android:theme="@style/TextModeTheme" />
-        <activity
-            android:name=".ui.reader.MainActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
-            android:documentLaunchMode="intoExisting"
-            android:exported="true">
-            <property
-                android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
-                android:value="true" />
+            android:name=".ReaderActivity"
+            android:exported="true"
+            android:theme="@style/SahlReader"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:host="*" />
-                <data android:scheme="smb" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-                <data android:pathPattern=".*\\.pdf" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:host="*" />
-                <data android:scheme="smb" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:host="*" />
-                <data android:scheme="file" />
                 <data android:scheme="content" />
-                <!-- Workaround to match files in paths with dots in them, like /sdcard/my.folder/test.pdf -->
-                <data android:pathPattern=".*\\.pdf" />
-                <data android:pathPattern=".*\\..*\\.pdf" />
-                <data android:pathPattern=".*\\..*\\..*\\.pdf" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:host="*" />
                 <data android:scheme="file" />
-                <data android:scheme="content" />
                 <data android:mimeType="application/pdf" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
-
                 <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".ui.about.AboutActivity"
-            android:exported="false"
-            android:label="@string/action_about"
-            android:parentActivityName=".ui.reader.MainActivity" />
-        <activity
-            android:name=".ui.about.WhatsNewActivity"
-            android:exported="false"
-            android:label="@string/whats_new_title" />
-        <activity
-            android:name=".ui.about.AppFeaturesActivity"
-            android:exported="false"
-            android:label="@string/features_title" />
-        <activity
-            android:name=".ui.about.FeatureTopicActivity"
-            android:exported="false"
-            android:label="@string/features_title" />
-        <activity
-            android:name=".ui.intro.MainIntroActivity"
-            android:exported="false"
-            android:label="@string/mj_app_name" />
-        <activity
-            android:name=".ui.settings.SettingsActivity"
-            android:exported="false"
-            android:label="@string/settings" />
 
-        <service
-            android:name=".ui.home.metadata.PdfMetadataService"
+        <activity
+            android:name=".SettingsActivity"
             android:exported="false"
-            android:process=":pdf_metadata" />
+            android:configChanges="orientation|screenSize|screenLayout" />
 
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+        <activity
+            android:name=".SahlCrashActivity"
+            android:exported="false" />
     </application>
-
 </manifest>
