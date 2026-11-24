@@ -73,6 +73,8 @@ androidComponents {
 dependencies {
     // PDFium (BSD-3-Clause) through the Apache-2.0 PdfiumAndroidKt binding.
     implementation("io.legere:pdfiumandroid:1.0.35")
+    // PdfiumAndroidKt declares coroutines as compileOnly, so the app must provide it at runtime.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     testImplementation("junit:junit:4.13.2")
 }
