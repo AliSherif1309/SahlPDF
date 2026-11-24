@@ -142,7 +142,27 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE); textSize = 16f; typeface = Typeface.DEFAULT_BOLD
             setPadding(dp(10), 0, dp(10), 0)
         })
-        root.addView(open, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), dp(8), dp(16), dp(12)) })
+        root.addView(open, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), dp(8), dp(16), dp(8)) })
+
+        val toolsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), 0, dp(16), dp(12))
+        }
+        fun toolCard(labelRes: Int, click: () -> Unit) = TextView(this).apply {
+            text = getString(labelRes)
+            setTextColor(pal.text)
+            textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(11), dp(12), dp(11))
+            Ui.focusable(this, pal.card, dp(16).toFloat(), pal.gold)
+            setOnClickListener { click() }
+        }
+        toolsRow.addView(toolCard(R.string.scan_to_pdf) { startActivity(Intent(this, ScanActivity::class.java)) },
+            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
+        toolsRow.addView(toolCard(R.string.merge_pdfs) { startActivity(Intent(this, MergeActivity::class.java)) },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(toolsRow)
 
         val tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL

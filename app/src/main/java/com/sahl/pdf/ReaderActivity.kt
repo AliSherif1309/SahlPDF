@@ -645,6 +645,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
         m.menu.add(0, 6, 0, R.string.doc_info)
         m.menu.add(0, 12, 0, R.string.save_annotated)
+        m.menu.add(0, 13, 0, R.string.organize_pages)
         if (uri.scheme == "content") {
             m.menu.add(0, 7, 0, R.string.share)
             m.menu.add(0, 8, 0, R.string.open_with)
@@ -670,6 +671,9 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 10 -> toggleTwoPage()
                 11 -> showAnnotations()
                 12 -> startExportAnnotated()
+                13 -> startActivity(Intent(this, OrganizePagesActivity::class.java)
+                    .setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    .putExtra(OrganizePagesActivity.EXTRA_NAME, name))
             }
             true
         }
