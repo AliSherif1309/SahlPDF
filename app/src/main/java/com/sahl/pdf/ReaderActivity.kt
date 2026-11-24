@@ -326,8 +326,13 @@ class ReaderActivity : Activity(), PdfView.Listener {
             progress.visibility = View.GONE
             r.onSuccess { d -> onOpened(d) }
             r.onFailure { e ->
+                android.util.Log.e("SahlPDF", "Failed to open $uri", e)
                 if (e is PdfPasswordException) askPassword(password != null)
-                else fail(if (e is SecurityException || e is java.io.FileNotFoundException) R.string.file_gone else R.string.cannot_open)
+                else {
+                    val msg = if (e is SecurityException || e is java.io.FileNotFoundException) R.string.file_gone else R.string.cannot_open
+                    val detail = "${e.javaClass.simpleName}: ${e.message ?: ""}".trim()
+                    fail(msg, detail)
+                }
             }
         }
     }
@@ -367,9 +372,10 @@ class ReaderActivity : Activity(), PdfView.Listener {
             .show()
     }
 
-    private fun fail(msg: Int) {
+    private fun fail(msg: Int, detail: String = "") {
+        val text = if (detail.isBlank()) getString(msg) else "${getString(msg)}\n\n($detail)"
         AlertDialog.Builder(this)
-            .setMessage(msg)
+            .setMessage(text)
             .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
             .setOnCancelListener { finish() }
             .show()

@@ -142,15 +142,17 @@ class MainActivity : Activity() {
         }
         tabRecent = tab(R.string.tab_recent) { selectTab(false) }
         tabDevice = tab(R.string.tab_device) { selectTab(true) }
-        val sendBtn = tab(R.string.send_from_phone) { showWifiTransfer() }.apply {
-            Ui.focusable(this, pal.card, dp(18).toFloat(), pal.gold)
-            setTextColor(pal.accent)
-            typeface = Typeface.DEFAULT_BOLD
-        }
         tabs.addView(tabRecent)
         tabs.addView(tabDevice, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
-        tabs.addView(View(this), LinearLayout.LayoutParams(0, 0, 1f))
-        tabs.addView(sendBtn)
+        if (Ui.isTv(this)) {
+            val sendBtn = tab(R.string.send_from_phone) { showWifiTransfer() }.apply {
+                Ui.focusable(this, pal.card, dp(18).toFloat(), pal.gold)
+                setTextColor(pal.accent)
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            tabs.addView(View(this), LinearLayout.LayoutParams(0, 0, 1f))
+            tabs.addView(sendBtn)
+        }
         root.addView(tabs)
 
         val body = android.widget.FrameLayout(this)

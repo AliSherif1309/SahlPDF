@@ -26,6 +26,7 @@ class PdfDoc private constructor(
     private val pdf: PdfDocument,
     private val pfd: ParcelFileDescriptor,
     val sizes: List<PageSize>,
+    private val tempFile: java.io.File? = null,
 ) {
     val pageCount get() = sizes.size
 
@@ -120,6 +121,7 @@ class PdfDoc private constructor(
         openPages.clear()
         runCatching { pdf.close() }
         runCatching { pfd.close() }
+        runCatching { tempFile?.delete() }
     }
 
     companion object {
@@ -130,14 +132,31 @@ class PdfDoc private constructor(
 
         /** Opens [uri]; throws [io.legere.pdfiumandroid.PdfPasswordException] when a (correct) password is needed. */
         fun open(c: Context, uri: Uri, password: String?): PdfDoc {
-            val pfd = c.contentResolver.openFileDescriptor(uri, "r") ?: error("Cannot open file")
-            val pdf = try {
-                core(c).newDocument(pfd, password)
-            } catch (e: Throwable) {
-                runCatching { pfd.close() }
-                throw e
-            }
+            var temp: java.io.File? = null
+            var pfd: ParcelFileDescriptor? = null
+            var pdf: PdfDocument? = null
             try {
+                val direct = c.contentResolver.openFileDescriptor(uri, "r")
+                if (direct != null) {
+                    try {
+                        pfd = direct
+                        pdf = core(c).newDocument(direct, password)
+                    } catch (e: io.legere.pdfiumandroid.PdfPasswordException) {
+                        throw e
+                    } catch (_: Throwable) {
+                        runCatching { direct.close() }
+                        pfd = null
+                    }
+                }
+                if (pdf == null) {
+                    val tmp = java.io.File.createTempFile("sahl_", ".pdf", c.cacheDir)
+                    temp = tmp
+                    val inp = c.contentResolver.openInputStream(uri) ?: error("Cannot open stream")
+                    inp.use { src -> tmp.outputStream().use { dst -> src.copyTo(dst) } }
+                    val tpfd = ParcelFileDescriptor.open(tmp, ParcelFileDescriptor.MODE_READ_ONLY)
+                    pfd = tpfd
+                    pdf = core(c).newDocument(tpfd, password)
+                }
                 val n = pdf.getPageCount()
                 if (n <= 0) error("No pages")
                 val sizes = ArrayList<PageSize>(n)
@@ -146,10 +165,11 @@ class PdfDoc private constructor(
                         sizes += PageSize(p.getPageWidthPoint().toFloat(), p.getPageHeightPoint().toFloat())
                     }
                 }
-                return PdfDoc(pdf, pfd, sizes)
+                return PdfDoc(pdf, pfd!!, sizes, temp)
             } catch (e: Throwable) {
-                runCatching { pdf.close() }
-                runCatching { pfd.close() }
+                runCatching { pdf?.close() }
+                runCatching { pfd?.close() }
+                runCatching { temp?.delete() }
                 throw e
             }
         }
