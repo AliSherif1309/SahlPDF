@@ -16,7 +16,7 @@ object UpdatePick {
         return null
     }
 
-    /** "2.0.17" -> [2, 0, 17]; anything unparsable -> empty. */
+    /** "1.55" or "2.0.17" -> [1, 55] / [2, 0, 17]; anything unparsable -> empty. */
     fun version(v: String): List<Int> =
-        if (Regex("""\d{1,9}\.\d{1,9}\.\d{1,9}""").matches(v)) v.split('.').map { it.toInt() } else emptyList()
+        if (Regex("""\d{1,9}\.\d{1,9}(?:\.\d{1,9})?""").matches(v)) v.split('.').map { it.toInt() } else emptyList()
 }

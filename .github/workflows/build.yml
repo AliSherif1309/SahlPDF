@@ -63,19 +63,21 @@ jobs:
         if: env.SIGNED == '1' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
-          VERSION=$(python3 -c "import json;print(json.load(open('out/version.json'))['sahlpdf'])")
-          TAG="build-$GITHUB_RUN_NUMBER"
-          NOTES="Sahl PDF $VERSION. Phones: SahlPDF-arm64-v8a.apk. Mi TV / older devices: SahlPDF-armeabi-v7a.apk. Not sure: SahlPDF.apk (universal)."
+          TAG="v1.$GITHUB_RUN_NUMBER"
+          TITLE="Sahl PDF $TAG"
+          FIRST_LINE=$(printf '%s\n' "$MSG" | head -n 1)
+          NOTES="$FIRST_LINE"$'\n\n'"Phones: SahlPDF-arm64-v8a.apk · Mi TV / 32-bit: SahlPDF-armeabi-v7a.apk · Universal: SahlPDF.apk"
           gh release create "$TAG" out/*.apk out/version.json out/SHA256SUMS --target "$GITHUB_SHA" \
-            --title "Sahl PDF $VERSION" --notes "$NOTES" --latest
+            --title "$TITLE" --notes "$NOTES" --latest
           # Stable download links: .../releases/download/latest/SahlPDF.apk
           if gh release view latest >/dev/null 2>&1; then
             gh release upload latest out/*.apk out/version.json out/SHA256SUMS --clobber
-            gh release edit latest --latest=false --title "Sahl PDF $VERSION (latest = $TAG)" --notes "$NOTES"
+            gh release edit latest --latest=false --title "$TITLE (latest = $TAG)" --notes "$NOTES"
           else
             gh release create latest out/*.apk out/version.json out/SHA256SUMS --target "$GITHUB_SHA" \
-              --title "Sahl PDF $VERSION (latest = $TAG)" --notes "$NOTES" --latest=false
+              --title "$TITLE (latest = $TAG)" --notes "$NOTES" --latest=false
           fi
           gh release edit "$TAG" --latest
