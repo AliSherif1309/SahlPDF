@@ -33,7 +33,15 @@ import java.util.concurrent.Executors
 class MainActivity : Activity() {
 
     /** One row in either list. */
-    private data class Row(val uri: Uri, val name: String, val sub: String, val key: String?, val book: Book?)
+    private data class Row(
+        val uri: Uri,
+        val name: String,
+        var sub: String,
+        val key: String?,
+        val book: Book?,
+        val size: Long = 0L,
+        val dateMs: Long = 0L,
+    )
 
     private lateinit var pal: Palette
     private lateinit var list: ListView
@@ -45,6 +53,7 @@ class MainActivity : Activity() {
     private lateinit var updateChip: TextView
     private var deviceTab = false
     private var rows: List<Row> = emptyList()
+    private var cachedDeviceRows: List<Row>? = null
     private val io = Executors.newFixedThreadPool(2)
     private val thumbs = LruCache<String, Bitmap>(8 * 1024 * 1024)
     private var release: Updater.Release? = null
@@ -227,6 +236,12 @@ class MainActivity : Activity() {
                 Row(Uri.parse(b.uri), b.name, parts.joinToString(" · "), b.key, b)
             }
             show(R.string.empty_recent, needAccess = false)
+            if (cachedDeviceRows == null && hasAccess()) {
+                io.execute {
+                    val found = queryDevicePdfs()
+                    runOnUiThread { if (!isFinishing) cachedDeviceRows = found }
+                }
+            }
             return
         }
         if (!hasAccess()) {
@@ -234,10 +249,16 @@ class MainActivity : Activity() {
             show(R.string.device_access_body, needAccess = true)
             return
         }
+        cachedDeviceRows?.let { cached ->
+            rows = cached
+            show(R.string.empty_device, needAccess = false)
+        }
         io.execute {
             val found = queryDevicePdfs()
             runOnUiThread {
-                if (isFinishing || !deviceTab) return@runOnUiThread
+                if (isFinishing) return@runOnUiThread
+                cachedDeviceRows = found
+                if (!deviceTab) return@runOnUiThread
                 rows = found
                 show(R.string.empty_device, needAccess = false)
             }
@@ -270,9 +291,7 @@ class MainActivity : Activity() {
                     val name = c.getString(1) ?: continue
                     val size = c.getLong(2)
                     val date = c.getLong(3) * 1000L
-                    val sub = Formatter.formatShortFileSize(this, size) + " · " +
-                        DateUtils.formatDateTime(this, date, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH)
-                    out += Row(ContentUris.withAppendedId(base, id), name, sub, Library.keyFor(Uri.EMPTY, name, size), null)
+                    out += Row(ContentUris.withAppendedId(base, id), name, "", Library.keyFor(Uri.EMPTY, name, size), null, size, date)
                 }
             }
         } catch (_: Exception) { }
@@ -429,7 +448,13 @@ class MainActivity : Activity() {
             val thumb = row.getChildAt(0) as ImageView
             val texts = row.getChildAt(1) as LinearLayout
             (texts.getChildAt(0) as TextView).text = r.name.removeSuffix(".pdf").removeSuffix(".PDF")
-            (texts.getChildAt(1) as TextView).text = r.sub
+            val subText = r.sub.ifEmpty {
+                if (r.size > 0L || r.dateMs > 0L) {
+                    (Formatter.formatShortFileSize(this@MainActivity, r.size) + " · " +
+                        DateUtils.formatDateTime(this@MainActivity, r.dateMs, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH)).also { r.sub = it }
+                } else ""
+            }
+            (texts.getChildAt(1) as TextView).text = subText
             bindThumb(thumb, r.key?.takeIf { r.book != null })
             return row
         }

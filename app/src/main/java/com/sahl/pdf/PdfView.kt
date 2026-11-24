@@ -46,6 +46,8 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         fun onShapeErased(id: String)
         fun onTextTap(page: Int, nx: Float, ny: Float)
         fun onShapeTap(entry: Library.ShapeEntry)
+        fun onAnnotationMoved(id: String, rects: List<NormRect>)
+        fun onShapeMoved(id: String, x1: Float, y1: Float, x2: Float, y2: Float)
     }
 
     var listener: Listener? = null
@@ -532,6 +534,12 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private var selectingDrag = false
     private var selectAnchorChar = -1
     private var selectPage = -1
+    private var selInFlight = false
+    private var selGen = 0
+    private var movingStickyId: String? = null
+    private var movingShapeId: String? = null
+    private var moveLastNx = 0f
+    private var moveLastNy = 0f
 
     /** Maps screen (x, y) to (pageIndex, normX, normY) in uncropped [0..1] page coordinates. */
     private fun hitTestPage(x: Float, y: Float): Triple<Int, Float, Float>? {
@@ -566,11 +574,11 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean { stopMotion(); return true }
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
-            if (scaling || selectingDrag) return true
+            if (scaling || selectingDrag || movingStickyId != null || movingShapeId != null) return true
             sx += dx; sy += dy; clamp(); notifyPage(); invalidate(); return true
         }
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
-            if (scaling || selectingDrag) return true
+            if (scaling || selectingDrag || movingStickyId != null || movingShapeId != null) return true
             if (flowMode != FlowMode.VERTICAL && zoom <= 1.01f) {
                 val l = layout ?: return true
                 val cur = l.pageAt((sx + width * 0.5f) / zoom, (sy + height * 0.5f) / zoom)
@@ -593,9 +601,26 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             val hit = hitTestPage(e.x, e.y) ?: return
             val (p, nx, ny) = hit
             performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            val sticky = annotations.firstOrNull { a -> a.page == p && a.style == "sticky" && a.rects.any { hitNorm(nx, ny, it, 0.025f) } }
+            if (sticky != null) {
+                movingStickyId = sticky.id
+                moveLastNx = nx; moveLastNy = ny
+                return
+            }
+            val textShape = shapes.firstOrNull { s ->
+                s.page == p && s.kind == "text" &&
+                    nx >= min(s.x1, s.x2) - 0.025f && nx <= max(s.x1, s.x2) + 0.025f &&
+                    ny >= min(s.y1, s.y2) - 0.025f && ny <= max(s.y1, s.y2) + 0.025f
+            }
+            if (textShape != null) {
+                movingShapeId = textShape.id
+                moveLastNx = nx; moveLastNy = ny
+                return
+            }
+            val gen = ++selGen
             renderer.call({ d.selectWordAt(p, nx, ny) }) { r ->
+                if (gen != selGen || doc !== d) return@call
                 val sel = r.getOrNull() ?: return@call
-                if (doc !== d) return@call
                 selection = sel
                 selectAnchorChar = sel.startChar
                 selectPage = p
@@ -780,6 +805,47 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             }
         }
 
+        if (movingStickyId != null || movingShapeId != null) {
+            if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                val hit = hitTestPage(event.x, event.y)
+                if (hit != null) {
+                    val dx = hit.second - moveLastNx
+                    val dy = hit.third - moveLastNy
+                    moveLastNx = hit.second; moveLastNy = hit.third
+                    movingStickyId?.let { id ->
+                        annotations = annotations.map { a ->
+                            if (a.id != id) a else a.copy(rects = a.rects.map { r ->
+                                NormRect((r.left + dx).coerceIn(0f, 0.96f), (r.top + dy).coerceIn(0f, 0.96f),
+                                    (r.right + dx).coerceIn(0.04f, 1f), (r.bottom + dy).coerceIn(0.04f, 1f))
+                            })
+                        }
+                    }
+                    movingShapeId?.let { id ->
+                        shapes = shapes.map { s ->
+                            if (s.id != id) s else s.copy(
+                                x1 = (s.x1 + dx).coerceIn(0f, 0.95f), y1 = (s.y1 + dy).coerceIn(0f, 0.95f),
+                                x2 = (s.x2 + dx).coerceIn(0.05f, 1f), y2 = (s.y2 + dy).coerceIn(0.05f, 1f),
+                            )
+                        }
+                    }
+                    invalidate()
+                }
+                return true
+            }
+            if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                movingStickyId?.let { id ->
+                    annotations.firstOrNull { it.id == id }?.let { listener?.onAnnotationMoved(id, it.rects) }
+                }
+                movingShapeId?.let { id ->
+                    shapes.firstOrNull { it.id == id }?.let { listener?.onShapeMoved(id, it.x1, it.y1, it.x2, it.y2) }
+                }
+                movingStickyId = null
+                movingShapeId = null
+                invalidate()
+                return true
+            }
+        }
+
         scale.onTouchEvent(event)
         val sel = selection
         if (event.actionMasked == MotionEvent.ACTION_DOWN && sel != null) {
@@ -794,19 +860,24 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             }
         }
         if ((dragHandle != 0 || selectingDrag) && event.actionMasked == MotionEvent.ACTION_MOVE) {
-            val d = doc
-            val curSel = selection
-            val hit = hitTestPage(event.x, event.y)
-            if (d != null && curSel != null && hit != null && hit.first == curSel.page) {
-                val (p, nx, ny) = hit
-                val callBlock: () -> TextSelection? = if (dragHandle != 0) {
-                    { d.selectBetween(p, curSel.startChar, curSel.endChar, nx, ny, moveStart = dragHandle == 1) }
-                } else {
-                    { d.selectRange(p, selectAnchorChar, nx, ny) }
-                }
-                renderer.call(callBlock) { r ->
-                    val updated = r.getOrNull() ?: return@call
-                    if (doc === d && selection != null) {
+            if (!selInFlight) {
+                val d = doc
+                val curSel = selection
+                val targetY = if (dragHandle != 0) event.y - 14f * dp else event.y
+                val hit = hitTestPage(event.x, targetY)
+                if (d != null && curSel != null && hit != null && hit.first == curSel.page) {
+                    val (p, nx, ny) = hit
+                    val gen = ++selGen
+                    selInFlight = true
+                    val callBlock: () -> TextSelection? = if (dragHandle != 0) {
+                        { d.selectBetween(p, curSel.startChar, curSel.endChar, nx, ny, moveStart = dragHandle == 1) }
+                    } else {
+                        { d.selectRange(p, selectAnchorChar, nx, ny) }
+                    }
+                    renderer.call(callBlock) { r ->
+                        selInFlight = false
+                        if (gen != selGen || doc !== d || selection == null) return@call
+                        val updated = r.getOrNull() ?: return@call
                         selection = updated
                         listener?.onSelectionChanged(updated)
                         invalidate()
