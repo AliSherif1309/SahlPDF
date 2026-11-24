@@ -19,7 +19,9 @@ class SettingsActivity : Activity() {
         const val KEEP_SCREEN = "keep_screen_on"
         const val FLOW_MODE = "flow_mode"
         const val FIT_MODE = "fit_mode"
+        const val TWO_PAGE = "two_page"
         const val CROP_MARGINS = "crop_margins"
+        const val TV_DEFAULTS_DONE = "tv_defaults_done"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,6 +128,8 @@ class SettingsActivity : Activity() {
                 sub.text = fitLabels[w]
             }.show()
         })
+        reading.addView(divider())
+        reading.addView(switchRow(R.string.two_page, TWO_PAGE, false))
         reading.addView(divider())
         reading.addView(switchRow(R.string.crop_margins, CROP_MARGINS, false))
         reading.addView(divider())

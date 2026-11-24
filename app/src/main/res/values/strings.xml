@@ -59,4 +59,11 @@
     <string name="fit_width">Fit width</string>
     <string name="fit_page">Fit whole page</string>
     <string name="crop_margins">Crop margins</string>
+    <string name="two_page">Two-page spread</string>
+    <string name="one_or_two_pages">One / two pages</string>
+    <string name="send_from_phone">Send from phone</string>
+    <string name="send_from_phone_desc">Open this address on your phone (same Wi-Fi) and enter the code:</string>
+    <string name="received_count">Received: %d</string>
+    <string name="tv_menu">Reader menu</string>
+    <string name="toolbars">Show / hide toolbars</string>
 </resources>

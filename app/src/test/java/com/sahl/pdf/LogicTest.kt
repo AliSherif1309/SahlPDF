@@ -56,6 +56,20 @@ class PageLayoutTest {
         assertEquals(0.69f, crop.right, 0.02f)
         assertEquals(0.79f, crop.bottom, 0.02f)
     }
+
+    @Test fun twoPageSpreadLtrAndRtl() {
+        val ltr = PageLayout(pages, 10f).apply { layout(800f, 600f, FlowMode.HORIZONTAL_LTR, FitMode.PAGE, spread = true) }
+        // Page 0 is cover (alone), pages 1 and 2 are paired [1 | 2]
+        assertEquals(true, ltr.snapX(0) < ltr.snapX(1))
+        assertEquals(ltr.snapX(1), ltr.snapX(2), 0.01f)
+        assertEquals(true, ltr.left(1) < ltr.left(2))
+
+        val rtl = PageLayout(pages, 10f).apply { layout(800f, 600f, FlowMode.HORIZONTAL_RTL, FitMode.PAGE, spread = true) }
+        // In RTL, spread [2 | 1] comes before cover [0]
+        assertEquals(true, rtl.snapX(1) < rtl.snapX(0))
+        assertEquals(rtl.snapX(1), rtl.snapX(2), 0.01f)
+        assertEquals(true, rtl.left(2) < rtl.left(1))
+    }
 }
 
 class UpdatePickTest {

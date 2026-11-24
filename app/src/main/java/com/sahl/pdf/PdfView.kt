@@ -64,6 +64,13 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             relayoutKeepingPage()
         }
 
+    var twoPage = false
+        set(v) {
+            if (field == v) return
+            field = v
+            relayoutKeepingPage()
+        }
+
     var cropMargins = false
         set(v) {
             if (field == v) return
@@ -168,6 +175,27 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         clamp(); notifyPage(); invalidate()
     }
 
+    fun stepPage(cur: Int = page, dir: Int): Int {
+        val n = pageCount
+        if (n <= 0 || dir == 0) return cur.coerceIn(0, max(0, n - 1))
+        val next = if (!twoPage || flowMode == FlowMode.VERTICAL) {
+            cur + dir
+        } else if (dir > 0) {
+            when {
+                cur <= 0 -> 1
+                cur % 2 == 1 -> cur + 2
+                else -> cur + 1
+            }
+        } else {
+            when {
+                cur <= 2 -> 0
+                cur % 2 == 1 -> cur - 2
+                else -> cur - 3
+            }
+        }
+        return next.coerceIn(0, n - 1)
+    }
+
     fun scrollByAnimated(dy: Float) {
         stopMotion()
         val target = (sy + dy).coerceIn(0f, maxY())
@@ -215,7 +243,7 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private fun relayout() {
         val l = layout ?: return
         if (width <= 0 || height <= 0) return
-        l.layout(width.toFloat(), height.toFloat(), flowMode, fitMode)
+        l.layout(width.toFloat(), height.toFloat(), flowMode, fitMode, twoPage)
         val newLow = min(width, 1280)
         if (newLow != lowW) { cache.evictAll(); lowW = newLow }
         details.clear()
@@ -436,12 +464,13 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             if (flowMode != FlowMode.VERTICAL && zoom <= 1.01f) {
                 val l = layout ?: return true
                 val cur = l.pageAt((sx + width * 0.5f) / zoom, (sy + height * 0.5f) / zoom)
-                val step = when {
+                val dir = when {
                     vx < -350f -> if (flowMode == FlowMode.HORIZONTAL_RTL) -1 else 1
                     vx > 350f -> if (flowMode == FlowMode.HORIZONTAL_RTL) 1 else -1
                     else -> 0
                 }
-                snapTo((cur + step).coerceIn(0, l.count - 1))
+                val next = stepPage(cur, dir).coerceIn(0, l.count - 1)
+                snapTo(next)
                 return true
             }
             scroller.fling(sx.roundToInt(), sy.roundToInt(), -vx.roundToInt(), -vy.roundToInt(),

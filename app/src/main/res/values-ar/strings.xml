@@ -59,4 +59,11 @@
     <string name="fit_width">ملء العرض</string>
     <string name="fit_page">عرض الصفحة كاملة</string>
     <string name="crop_margins">قص الهوامش</string>
+    <string name="two_page">صفحتان متقابلتان</string>
+    <string name="one_or_two_pages">صفحة واحدة / صفحتان</string>
+    <string name="send_from_phone">إرسال من الهاتف</string>
+    <string name="send_from_phone_desc">افتح هذا العنوان على هاتفك (نفس شبكة الواي فاي) وأدخل الرمز:</string>
+    <string name="received_count">تم استلام: %d</string>
+    <string name="tv_menu">قائمة القارئ</string>
+    <string name="toolbars">إظهار / إخفاء الأشرطة</string>
 </resources>

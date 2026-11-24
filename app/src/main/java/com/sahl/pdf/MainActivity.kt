@@ -137,12 +137,20 @@ class MainActivity : Activity() {
 
         val tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), 0, dp(16), dp(8))
         }
         tabRecent = tab(R.string.tab_recent) { selectTab(false) }
         tabDevice = tab(R.string.tab_device) { selectTab(true) }
+        val sendBtn = tab(R.string.send_from_phone) { showWifiTransfer() }.apply {
+            Ui.focusable(this, pal.card, dp(18).toFloat(), pal.gold)
+            setTextColor(pal.accent)
+            typeface = Typeface.DEFAULT_BOLD
+        }
         tabs.addView(tabRecent)
         tabs.addView(tabDevice, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        tabs.addView(View(this), LinearLayout.LayoutParams(0, 0, 1f))
+        tabs.addView(sendBtn)
         root.addView(tabs)
 
         val body = android.widget.FrameLayout(this)
@@ -348,6 +356,61 @@ class MainActivity : Activity() {
             .setMessage(r.notes.ifBlank { Updater.updateNowText(this) })
             .setPositiveButton(Updater.updateNowText(this)) { _, _ -> Updater.download(this, r) }
             .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showWifiTransfer() {
+        var received = 0
+        lateinit var statusView: TextView
+        val transfer = WifiTransfer(this) { _, _ ->
+            received++
+            runOnUiThread {
+                if (!isFinishing) {
+                    statusView.text = getString(R.string.received_count, received)
+                    refresh()
+                }
+            }
+        }
+        if (!transfer.start()) {
+            Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(12), dp(24), dp(8))
+        }
+        box.addView(TextView(this).apply {
+            text = getString(R.string.send_from_phone_desc)
+            textSize = 14f
+            setTextColor(pal.sub)
+        })
+        box.addView(TextView(this).apply {
+            text = transfer.url
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(pal.accent)
+            setTextIsSelectable(true)
+            setPadding(0, dp(10), 0, dp(4))
+        })
+        box.addView(TextView(this).apply {
+            text = transfer.code
+            textSize = 32f
+            typeface = Typeface.MONOSPACE
+            setTextColor(pal.gold)
+            setPadding(0, dp(4), 0, dp(8))
+        })
+        statusView = TextView(this).apply {
+            text = getString(R.string.received_count, 0)
+            textSize = 14f
+            setTextColor(pal.text)
+        }
+        box.addView(statusView)
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.send_from_phone)
+            .setView(box)
+            .setPositiveButton(android.R.string.ok, null)
+            .setOnDismissListener { transfer.stop() }
             .show()
     }
 
