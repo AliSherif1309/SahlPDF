@@ -101,4 +101,14 @@ class UpdatePickTest {
         assertEquals(listOf(2, 0, 17), UpdatePick.version("2.0.17"))
         assertEquals(emptyList<Int>(), UpdatePick.version("bad"))
     }
+
+    @Test fun picksVersionedApkNames() {
+        val versioned = mapOf(
+            "SahlPDF-v1.58.apk" to 10058L,
+            "SahlPDF-armeabi-v7a-v1.58.apk" to 20058L,
+            "SahlPDF-arm64-v8a-v1.58.apk" to 30058L,
+        )
+        assertEquals("SahlPDF-arm64-v8a-v1.58.apk", UpdatePick.choose(versioned, listOf("arm64-v8a"), 30040L))
+        assertEquals("SahlPDF-v1.58.apk", UpdatePick.choose(versioned, listOf("x86_64"), 10001L))
+    }
 }

@@ -34,11 +34,12 @@ def main() -> None:
             raise SystemExit(f"{apk.name}: unexpected package {pkg}")
         apks[apk.name] = {"code": code}
         versions.add(version)
-    if "SahlPDF.apk" not in apks:
-        raise SystemExit("universal SahlPDF.apk missing")
+    uni = next((k for k in apks if k == "SahlPDF.apk" or k.startswith("SahlPDF-v")), None)
+    if not uni:
+        raise SystemExit("universal SahlPDF APK missing")
     if len(versions) != 1:
         raise SystemExit(f"APKs disagree on version: {versions}")
-    meta = {"code": apks["SahlPDF.apk"]["code"], "sahlpdf": versions.pop(), "notes": a.notes, "apks": apks}
+    meta = {"code": apks[uni]["code"], "sahlpdf": versions.pop(), "notes": a.notes, "apks": apks}
     (out / "version.json").write_text(json.dumps(meta), encoding="utf-8")
     print(json.dumps(meta, indent=2))
 
