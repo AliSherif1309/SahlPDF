@@ -16,6 +16,9 @@ import io.legere.pdfiumandroid.PdfiumCore
 /** A table-of-contents entry, flattened with its depth. */
 data class TocItem(val title: String, val page: Int, val depth: Int)
 
+/** One search match on [page] with normalized [0..1] highlight boxes. */
+data class SearchHit(val page: Int, val rects: List<NormRect>)
+
 /**
  * An open PDF. Not thread-safe: every call must happen on the [Renderer] thread.
  */
@@ -50,6 +53,51 @@ class PdfDoc private constructor(
         val bmp = Bitmap.createBitmap(width, h, Bitmap.Config.ARGB_8888)
         render(i, bmp, 0, 0, width, h)
         return bmp
+    }
+
+    fun detectCrop(i: Int): NormRect {
+        val bmp = renderThumb(i, 160)
+        return try {
+            val w = bmp.width; val h = bmp.height
+            val pixels = IntArray(w * h)
+            bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+            MarginCrop.detect(pixels, w, h)
+        } finally {
+            bmp.recycle()
+        }
+    }
+
+    fun search(query: String, cancel: () -> Boolean): List<SearchHit> {
+        val q = query.trim()
+        if (q.isEmpty()) return emptyList()
+        val hits = ArrayList<SearchHit>()
+        for (i in 0 until pageCount) {
+            if (cancel()) break
+            runCatching {
+                val p = page(i)
+                p.openTextPage().use { tp ->
+                    tp.findStart(q, emptySet(), 0)?.use { fr ->
+                        while (!cancel() && fr.findNext()) {
+                            val start = fr.getSchResultIndex()
+                            val count = fr.getSchCount()
+                            val nRects = tp.textPageCountRects(start, count)
+                            val rects = ArrayList<NormRect>(nRects)
+                            for (r in 0 until nRects) {
+                                val pr = tp.textPageGetRect(r) ?: continue
+                                val dr = p.mapRectToDevice(0, 0, 10000, 10000, 0, pr)
+                                val left = minOf(dr.left, dr.right) / 10000f
+                                val top = minOf(dr.top, dr.bottom) / 10000f
+                                val right = maxOf(dr.left, dr.right) / 10000f
+                                val bottom = maxOf(dr.top, dr.bottom) / 10000f
+                                if (right > left && bottom > top) rects += NormRect(left, top, right, bottom)
+                            }
+                            if (rects.isNotEmpty()) hits += SearchHit(i, rects)
+                        }
+                    }
+                }
+            }
+        }
+        return hits
     }
 
     fun toc(): List<TocItem> {

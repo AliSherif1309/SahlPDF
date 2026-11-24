@@ -42,4 +42,21 @@
     <string name="licences">تراخيص المصادر المفتوحة</string>
     <string name="licences_body">سهل PDF — ترخيص MIT.\n\nPDFium (Google / Foxit) — ترخيص BSD 3-Clause.\nPdfiumAndroidKt (io.legere) — رخصة Apache 2.0.\nمكتبة Kotlin القياسية و coroutines (JetBrains) — رخصة Apache 2.0.\nGuava (Google) — رخصة Apache 2.0.</string>
     <string name="update_chip">تحديث</string>
+    <string name="search">بحث</string>
+    <string name="search_hint">ابحث في المستند…</string>
+    <string name="search_count">%1$d / %2$d</string>
+    <string name="search_none">لا توجد نتائج</string>
+    <string name="bookmarks">الإشارات المرجعية</string>
+    <string name="bookmark_add">إضافة إشارة مرجعية</string>
+    <string name="bookmark_added">تمت إضافة الإشارة</string>
+    <string name="bookmark_removed">تمت إزالة الإشارة</string>
+    <string name="no_bookmarks">لا توجد إشارات مرجعية بعد.</string>
+    <string name="reading_mode">اتجاه القراءة</string>
+    <string name="mode_vertical">تمرير عمودي</string>
+    <string name="mode_ltr">أفقي (من اليسار لليمين)</string>
+    <string name="mode_rtl">أفقي (من اليمين لليسار · عربي)</string>
+    <string name="fit_mode">ملاءمة الصفحة</string>
+    <string name="fit_width">ملء العرض</string>
+    <string name="fit_page">عرض الصفحة كاملة</string>
+    <string name="crop_margins">قص الهوامش</string>
 </resources>

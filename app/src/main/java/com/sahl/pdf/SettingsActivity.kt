@@ -17,6 +17,9 @@ class SettingsActivity : Activity() {
         const val PREFS = "sahl_pdf_prefs"
         const val NIGHT = "night_pages"
         const val KEEP_SCREEN = "keep_screen_on"
+        const val FLOW_MODE = "flow_mode"
+        const val FIT_MODE = "fit_mode"
+        const val CROP_MARGINS = "crop_margins"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,6 +109,26 @@ class SettingsActivity : Activity() {
         }
 
         val reading = card()
+        val flowLabels = arrayOf(getString(R.string.mode_vertical), getString(R.string.mode_ltr), getString(R.string.mode_rtl))
+        val curFlow = sp.getInt(FLOW_MODE, 0).coerceIn(0, 2)
+        reading.addView(textRow(getString(R.string.reading_mode), flowLabels[curFlow], pal.accent) { sub ->
+            AlertDialog.Builder(this).setTitle(R.string.reading_mode).setItems(flowLabels) { _, w ->
+                sp.edit().putInt(FLOW_MODE, w).apply()
+                sub.text = flowLabels[w]
+            }.show()
+        })
+        reading.addView(divider())
+        val fitLabels = arrayOf(getString(R.string.fit_width), getString(R.string.fit_page))
+        val curFit = sp.getInt(FIT_MODE, 0).coerceIn(0, 1)
+        reading.addView(textRow(getString(R.string.fit_mode), fitLabels[curFit], pal.accent) { sub ->
+            AlertDialog.Builder(this).setTitle(R.string.fit_mode).setItems(fitLabels) { _, w ->
+                sp.edit().putInt(FIT_MODE, w).apply()
+                sub.text = fitLabels[w]
+            }.show()
+        })
+        reading.addView(divider())
+        reading.addView(switchRow(R.string.crop_margins, CROP_MARGINS, false))
+        reading.addView(divider())
         reading.addView(switchRow(R.string.set_night_default, NIGHT, false))
         reading.addView(divider())
         reading.addView(switchRow(R.string.set_keep_screen, KEEP_SCREEN, true))

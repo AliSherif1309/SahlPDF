@@ -17,6 +17,8 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -34,8 +36,12 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private val renderer = Renderer()
     private lateinit var pdfView: PdfView
     private lateinit var topBar: LinearLayout
+    private lateinit var searchBar: LinearLayout
     private lateinit var bottomBar: LinearLayout
     private lateinit var titleView: TextView
+    private lateinit var bookmarkBtn: ImageView
+    private lateinit var searchInput: EditText
+    private lateinit var searchCount: TextView
     private lateinit var pageLabel: TextView
     private lateinit var pagePill: TextView
     private lateinit var seek: SeekBar
@@ -47,6 +53,11 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private var size = -1L
     private var key = ""
     private var barsShown = true
+    private var searchOpen = false
+    private var searchGen = 0
+    private var searchHits: List<SearchHit> = emptyList()
+    private var searchIdx = -1
+
     private val prefs by lazy { getSharedPreferences(SettingsActivity.PREFS, MODE_PRIVATE) }
     private val hidePill = Runnable { pagePill.animate().alpha(0f).setDuration(250).start() }
 
@@ -62,8 +73,29 @@ class ReaderActivity : Activity(), PdfView.Listener {
         key = Library.keyFor(uri, name, size)
 
         buildUi()
-        if (prefs.getBoolean(SettingsActivity.KEEP_SCREEN, true)) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        applyPrefs()
         open(null)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::pdfView.isInitialized) applyPrefs()
+    }
+
+    private fun applyPrefs() {
+        val flows = FlowMode.entries
+        pdfView.flowMode = flows[prefs.getInt(SettingsActivity.FLOW_MODE, 0).coerceIn(0, flows.lastIndex)]
+        val fits = FitMode.entries
+        pdfView.fitMode = fits[prefs.getInt(SettingsActivity.FIT_MODE, 0).coerceIn(0, fits.lastIndex)]
+        pdfView.cropMargins = prefs.getBoolean(SettingsActivity.CROP_MARGINS, false)
+        val night = prefs.getBoolean(SettingsActivity.NIGHT, false)
+        pdfView.night = night
+        pdfView.paperBg = if (night) Color.rgb(12, 14, 13) else getColor(R.color.reader_bg)
+        if (prefs.getBoolean(SettingsActivity.KEEP_SCREEN, true)) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     private fun documentUri(i: Intent): Uri? = when (i.action) {
@@ -81,10 +113,20 @@ class ReaderActivity : Activity(), PdfView.Listener {
         setImageResource(res)
         contentDescription = getString(desc)
         setColorFilter(Color.WHITE)
-        setPadding(dp(12), dp(12), dp(12), dp(12))
-        Ui.focusable(this, Color.TRANSPARENT, dp(24).toFloat(), Color.parseColor("#F5C84C"))
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        Ui.focusable(this, Color.TRANSPARENT, dp(22).toFloat(), Color.parseColor("#F5C84C"))
         setOnClickListener(click)
-        layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+    }
+
+    private fun smallTextBtn(label: String, click: (View) -> Unit) = TextView(this).apply {
+        text = label
+        setTextColor(Color.WHITE)
+        textSize = 18f
+        gravity = Gravity.CENTER
+        Ui.focusable(this, Color.TRANSPARENT, dp(18).toFloat(), Color.parseColor("#F5C84C"))
+        setOnClickListener(click)
+        layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
     }
 
     private fun buildUi() {
@@ -95,32 +137,70 @@ class ReaderActivity : Activity(), PdfView.Listener {
             listener = this@ReaderActivity
             isFocusable = true
             isFocusableInTouchMode = true
-            night = prefs.getBoolean(SettingsActivity.NIGHT, false)
-            paperBg = if (night) Color.rgb(12, 14, 13) else getColor(R.color.reader_bg)
         }
         root.addView(pdfView, FrameLayout.LayoutParams(-1, -1))
+
+        val topContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(barColor)
+        }
 
         topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(barColor)
             setPadding(dp(4), 0, dp(4), 0)
         }
         topBar.addView(icon(R.drawable.ic_back, R.string.app_name) { finish() })
         titleView = TextView(this).apply {
             text = name.removeSuffix(".pdf").removeSuffix(".PDF")
             setTextColor(Color.WHITE)
-            textSize = 17f
+            textSize = 16f
             typeface = Typeface.DEFAULT_BOLD
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
             setPadding(dp(4), 0, dp(4), 0)
         }
         topBar.addView(titleView, LinearLayout.LayoutParams(0, -2, 1f))
+        topBar.addView(icon(R.drawable.ic_sahl_search, R.string.search) { openSearch() })
+        bookmarkBtn = icon(R.drawable.ic_bookmark, R.string.bookmark_add) { toggleCurrentBookmark() }
+        topBar.addView(bookmarkBtn)
         topBar.addView(icon(R.drawable.ic_toc, R.string.contents) { showContents() })
         topBar.addView(icon(R.drawable.ic_night, R.string.night_pages) { toggleNight() })
         topBar.addView(icon(R.drawable.ic_sahl_more, R.string.settings_title) { showMenu(it) })
-        root.addView(topBar, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        topContainer.addView(topBar, LinearLayout.LayoutParams(-1, -2))
+
+        searchBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(4), dp(8), dp(6))
+            visibility = View.GONE
+        }
+        searchInput = EditText(this).apply {
+            hint = getString(R.string.search_hint)
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#9AA3AB"))
+            textSize = 15f
+            isSingleLine = true
+            imeOptions = EditorInfo.IME_ACTION_SEARCH
+            background = Ui.rounded(Color.parseColor("#22FFFFFF"), dp(10).toFloat())
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) { runSearch(); true } else false
+            }
+        }
+        searchBar.addView(searchInput, LinearLayout.LayoutParams(0, -2, 1f))
+        searchCount = TextView(this).apply {
+            setTextColor(Color.parseColor("#D8E0DC"))
+            textSize = 13f
+            setPadding(dp(8), 0, dp(4), 0)
+        }
+        searchBar.addView(searchCount)
+        searchBar.addView(smallTextBtn("▲") { stepSearch(-1) })
+        searchBar.addView(smallTextBtn("▼") { stepSearch(1) })
+        searchBar.addView(icon(R.drawable.ic_close, android.R.string.cancel) { closeSearch() })
+        topContainer.addView(searchBar, LinearLayout.LayoutParams(-1, -2))
+
+        root.addView(topContainer, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
 
         bottomBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -170,7 +250,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
             val left = insets.systemWindowInsetLeft
             @Suppress("DEPRECATION")
             val right = insets.systemWindowInsetRight
-            topBar.setPadding(dp(4) + left, top, dp(4) + right, 0)
+            topContainer.setPadding(left, top, right, 0)
             bottomBar.setPadding(dp(16) + left, dp(6), dp(8) + right, dp(6) + bottom)
             insets
         }
@@ -189,7 +269,8 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private fun setBars(show: Boolean) {
         if (show == barsShown) return
         barsShown = show
-        for (bar in listOf(topBar, bottomBar)) {
+        val topParent = topBar.parent as View
+        for (bar in listOf(topParent, bottomBar)) {
             if (show) {
                 bar.visibility = View.VISIBLE
                 bar.animate().alpha(1f).setDuration(150).start()
@@ -218,6 +299,14 @@ class ReaderActivity : Activity(), PdfView.Listener {
         val n = pdfView.pageCount
         pageLabel.text = getString(R.string.page_short, p + 1, n)
         pagePill.text = getString(R.string.page_short, p + 1, n)
+        updateBookmarkIcon(p)
+    }
+
+    private fun updateBookmarkIcon(p: Int) {
+        if (!::bookmarkBtn.isInitialized) return
+        val marked = Library.isBookmarked(this, key, p)
+        bookmarkBtn.setImageResource(if (marked) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark)
+        if (marked) bookmarkBtn.clearColorFilter() else bookmarkBtn.setColorFilter(Color.WHITE)
     }
 
     // ---- document ----------------------------------------------------------------------
@@ -250,7 +339,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 FileOutputStream(thumb).use { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }
             }) { }
         }
-        pdfView.postDelayed({ if (!isFinishing && pdfView.zoom == 1f) setBars(false) }, 1800)
+        pdfView.postDelayed({ if (!isFinishing && !searchOpen && pdfView.zoom == 1f) setBars(false) }, 1800)
     }
 
     private fun askPassword(wrong: Boolean) {
@@ -277,7 +366,84 @@ class ReaderActivity : Activity(), PdfView.Listener {
             .show()
     }
 
-    // ---- actions -----------------------------------------------------------------------
+    // ---- search ------------------------------------------------------------------------
+
+    private fun openSearch() {
+        searchOpen = true
+        setBars(true)
+        searchBar.visibility = View.VISIBLE
+        searchInput.requestFocus()
+        getSystemService(InputMethodManager::class.java)?.showSoftInput(searchInput, 0)
+    }
+
+    private fun closeSearch() {
+        searchOpen = false
+        searchGen++
+        searchHits = emptyList()
+        searchIdx = -1
+        searchCount.text = ""
+        searchBar.visibility = View.GONE
+        pdfView.setSearchResults(emptyList(), -1)
+        getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(searchInput.windowToken, 0)
+        pdfView.requestFocus()
+    }
+
+    private fun runSearch() {
+        val d = doc ?: return
+        val q = searchInput.text.toString().trim()
+        if (q.isEmpty()) return
+        val gen = ++searchGen
+        searchCount.text = "…"
+        getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(searchInput.windowToken, 0)
+        renderer.call({ d.search(q) { searchGen != gen || renderer.quit } }) { r ->
+            if (gen != searchGen || isFinishing) return@call
+            val hits = r.getOrDefault(emptyList())
+            searchHits = hits
+            if (hits.isEmpty()) {
+                searchIdx = -1
+                searchCount.text = getString(R.string.search_none)
+                pdfView.setSearchResults(emptyList(), -1)
+            } else {
+                val cur = pdfView.page
+                val firstOnOrAfter = hits.indexOfFirst { it.page >= cur }.let { if (it >= 0) it else 0 }
+                searchIdx = firstOnOrAfter
+                searchCount.text = getString(R.string.search_count, searchIdx + 1, hits.size)
+                pdfView.setSearchResults(hits, searchIdx)
+            }
+        }
+    }
+
+    private fun stepSearch(delta: Int) {
+        if (searchHits.isEmpty()) return
+        searchIdx = (searchIdx + delta + searchHits.size) % searchHits.size
+        searchCount.text = getString(R.string.search_count, searchIdx + 1, searchHits.size)
+        pdfView.setSearchResults(searchHits, searchIdx)
+    }
+
+    // ---- bookmarks & actions -----------------------------------------------------------
+
+    private fun toggleCurrentBookmark() {
+        if (doc == null) return
+        val p = pdfView.page
+        val label = getString(R.string.page_of, p + 1, pdfView.pageCount)
+        val added = Library.toggleBookmark(this, key, p, label)
+        updateBookmarkIcon(p)
+        Toast.makeText(this, if (added) R.string.bookmark_added else R.string.bookmark_removed, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showBookmarks() {
+        val list = Library.bookmarks(this, key)
+        if (list.isEmpty()) {
+            Toast.makeText(this, R.string.no_bookmarks, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = list.map { getString(R.string.page_of, it.page + 1, pdfView.pageCount) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.bookmarks)
+            .setItems(labels) { _, which -> pdfView.goTo(list[which].page); updateLabel(list[which].page) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
 
     private fun toggleNight() {
         val on = !pdfView.night
@@ -318,24 +484,63 @@ class ReaderActivity : Activity(), PdfView.Listener {
             .show()
     }
 
+    private fun chooseFlowMode() {
+        val labels = arrayOf(getString(R.string.mode_vertical), getString(R.string.mode_ltr), getString(R.string.mode_rtl))
+        val cur = prefs.getInt(SettingsActivity.FLOW_MODE, 0).coerceIn(0, 2)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.reading_mode)
+            .setSingleChoiceItems(labels, cur) { dlg, which ->
+                prefs.edit().putInt(SettingsActivity.FLOW_MODE, which).apply()
+                pdfView.flowMode = FlowMode.entries[which]
+                dlg.dismiss()
+            }.show()
+    }
+
+    private fun chooseFitMode() {
+        val labels = arrayOf(getString(R.string.fit_width), getString(R.string.fit_page))
+        val cur = prefs.getInt(SettingsActivity.FIT_MODE, 0).coerceIn(0, 1)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.fit_mode)
+            .setSingleChoiceItems(labels, cur) { dlg, which ->
+                prefs.edit().putInt(SettingsActivity.FIT_MODE, which).apply()
+                pdfView.fitMode = FitMode.entries[which]
+                dlg.dismiss()
+            }.show()
+    }
+
     private fun showMenu(anchor: View) {
         val m = PopupMenu(this, anchor)
         m.menu.add(0, 1, 0, R.string.go_to_page)
-        m.menu.add(0, 2, 0, R.string.doc_info)
-        if (uri.scheme == "content") {
-            m.menu.add(0, 3, 0, R.string.share)
-            m.menu.add(0, 4, 0, R.string.open_with)
+        m.menu.add(0, 2, 0, R.string.bookmarks)
+        m.menu.add(0, 3, 0, R.string.reading_mode)
+        m.menu.add(0, 4, 0, R.string.fit_mode)
+        m.menu.add(0, 5, 0, R.string.crop_margins).apply {
+            isCheckable = true
+            isChecked = pdfView.cropMargins
         }
-        m.menu.add(0, 5, 0, R.string.settings_title)
+        m.menu.add(0, 6, 0, R.string.doc_info)
+        if (uri.scheme == "content") {
+            m.menu.add(0, 7, 0, R.string.share)
+            m.menu.add(0, 8, 0, R.string.open_with)
+        }
+        m.menu.add(0, 9, 0, R.string.settings_title)
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> askPage()
-                2 -> showInfo()
-                3 -> startSafely(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("application/pdf")
+                2 -> showBookmarks()
+                3 -> chooseFlowMode()
+                4 -> chooseFitMode()
+                5 -> {
+                    val next = !pdfView.cropMargins
+                    prefs.edit().putBoolean(SettingsActivity.CROP_MARGINS, next).apply()
+                    pdfView.cropMargins = next
+                }
+                6 -> showInfo()
+                7 -> startSafely(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("application/pdf")
                     .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.share)))
-                4 -> startSafely(Intent.createChooser(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf")
+                8 -> startSafely(Intent.createChooser(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf")
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.open_with)))
-                5 -> startActivity(Intent(this, SettingsActivity::class.java))
+                9 -> startActivity(Intent(this, SettingsActivity::class.java))
             }
             true
         }
@@ -379,18 +584,22 @@ class ReaderActivity : Activity(), PdfView.Listener {
 
     private fun seekTracking() = seek.isPressed
 
-    override fun onTap() = setBars(!barsShown)
+    override fun onTap() {
+        if (searchOpen) return
+        setBars(!barsShown)
+    }
 
     // ---- keys (TV remote, keyboards) -----------------------------------------------------
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (doc == null) return super.onKeyDown(keyCode, event)
+        val rtl = pdfView.flowMode == FlowMode.HORIZONTAL_RTL
         val step = pdfView.height * 0.3f
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_DOWN -> if (!barsShown) { pdfView.scrollByAnimated(step); return true }
             KeyEvent.KEYCODE_DPAD_UP -> if (!barsShown) { pdfView.scrollByAnimated(-step); return true }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> if (!barsShown) { pdfView.goTo(pdfView.page + 1); return true }
-            KeyEvent.KEYCODE_DPAD_LEFT -> if (!barsShown) { pdfView.goTo(pdfView.page - 1); return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (!barsShown) { pdfView.goTo(pdfView.page + if (rtl) -1 else 1); return true }
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (!barsShown) { pdfView.goTo(pdfView.page + if (rtl) 1 else -1); return true }
             KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_CHANNEL_DOWN -> {
                 pdfView.goTo(pdfView.page + 1); return true
             }
@@ -404,6 +613,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
     }
 
     override fun onBackPressed() {
+        if (searchOpen) { closeSearch(); return }
         if (!barsShown && Ui.isTv(this)) { setBars(true); return }
         @Suppress("DEPRECATION")
         super.onBackPressed()
