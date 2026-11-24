@@ -224,6 +224,12 @@ object Library {
         saveAnnotations(c, docKey, annotations(c, docKey).map { if (it.id == id) it.copy(note = note) else it })
     }
 
+    fun moveAnnotation(c: Context, docKey: String, id: String, rects: List<NormRect>): List<AnnotationEntry> {
+        val next = annotations(c, docKey).map { if (it.id == id) it.copy(rects = rects) else it }
+        saveAnnotations(c, docKey, next)
+        return next
+    }
+
     fun removeAnnotation(c: Context, docKey: String, id: String) {
         saveAnnotations(c, docKey, annotations(c, docKey).filter { it.id != id })
     }
@@ -353,6 +359,12 @@ object Library {
 
     fun updateShapeText(c: Context, docKey: String, id: String, text: String): List<ShapeEntry> {
         val next = shapes(c, docKey).map { if (it.id == id) it.copy(text = text) else it }
+        saveShapes(c, docKey, next)
+        return next
+    }
+
+    fun moveShape(c: Context, docKey: String, id: String, x1: Float, y1: Float, x2: Float, y2: Float): List<ShapeEntry> {
+        val next = shapes(c, docKey).map { if (it.id == id) it.copy(x1 = x1, y1 = y1, x2 = x2, y2 = y2) else it }
         saveShapes(c, docKey, next)
         return next
     }

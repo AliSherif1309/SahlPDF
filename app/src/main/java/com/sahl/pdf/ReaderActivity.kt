@@ -786,7 +786,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
 
         val input = EditText(this).apply {
-            setText(initialNote)
+            setText(NoteFormat.decode(initialNote))
             hint = getString(R.string.note_hint)
             setTextColor(pal.text)
             setHintTextColor(pal.sub)
@@ -819,13 +819,13 @@ class ReaderActivity : Activity(), PdfView.Listener {
             Ui.focusable(this, pal.card, dp(12).toFloat(), pal.gold)
             setOnClickListener { click() }
         }
-        fmtBar.addView(fmtBtn("B", bold = true) { NoteFormat.wrap(input, "**", "**") },
+        fmtBar.addView(fmtBtn("B", bold = true) { NoteFormat.toggleStyle(input, Typeface.BOLD) },
             LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        fmtBar.addView(fmtBtn("I", italic = true) { NoteFormat.wrap(input, "*", "*") },
+        fmtBar.addView(fmtBtn("I", italic = true) { NoteFormat.toggleStyle(input, Typeface.ITALIC) },
             LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        fmtBar.addView(fmtBtn("•") { NoteFormat.toggleLinePrefix(input, "- ") },
+        fmtBar.addView(fmtBtn("•") { NoteFormat.toggleLinePrefix(input, "• ") },
             LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        fmtBar.addView(fmtBtn("☑") { NoteFormat.toggleLinePrefix(input, "- [ ] ") })
+        fmtBar.addView(fmtBtn("☐") { NoteFormat.toggleLinePrefix(input, "☐ ") })
         card.addView(fmtBar)
         card.addView(input, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
@@ -845,7 +845,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
             setPadding(dp(20), dp(10), dp(20), dp(10))
             Ui.focusable(this, pal.accent, dp(14).toFloat(), pal.gold)
             setOnClickListener {
-                onSave(input.text.toString().trim())
+                onSave(NoteFormat.encode(input.text))
                 dlg.dismiss()
             }
         }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
@@ -866,7 +866,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
         val labels = list.map { a ->
             val pStr = getString(R.string.page_short, a.page + 1, pdfView.pageCount)
-            val body = a.note.ifBlank { a.text }.replace('\n', ' ').take(60)
+            val body = (if (a.note.isNotBlank()) NoteFormat.decode(a.note).toString() else a.text).replace('\n', ' ').take(60)
             "$pStr  ·  $body"
         }.toTypedArray()
         AlertDialog.Builder(this)
@@ -962,7 +962,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         if (entry.note.isNotBlank()) {
             card.addView(TextView(this).apply {
-                text = NoteFormat.render(entry.note)
+                text = NoteFormat.decode(entry.note)
                 textSize = 15f; setTextColor(pal.text)
                 setPadding(dp(4), dp(2), dp(4), dp(12))
             })
@@ -1149,10 +1149,18 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 if (updated.isBlank()) {
                     pdfView.setShapes(Library.removeShape(this, key, entry.id))
                 } else {
-                    pdfView.setShapes(Library.updateShapeText(this, key, entry.id, updated))
+                    pdfView.setShapes(Library.updateShapeText(this, key, entry.id, NoteFormat.decode(updated).toString()))
                 }
             }
         }
+    }
+
+    override fun onAnnotationMoved(id: String, rects: List<NormRect>) {
+        pdfView.setAnnotations(Library.moveAnnotation(this, key, id, rects))
+    }
+
+    override fun onShapeMoved(id: String, x1: Float, y1: Float, x2: Float, y2: Float) {
+        pdfView.setShapes(Library.moveShape(this, key, id, x1, y1, x2, y2))
     }
 
     // ---- keys (TV remote, keyboards) -----------------------------------------------------
