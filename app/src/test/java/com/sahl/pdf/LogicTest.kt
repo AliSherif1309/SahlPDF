@@ -97,7 +97,8 @@ class UpdatePickTest {
     }
 
     @Test fun parsesVersions() {
+        assertEquals(listOf(1, 55), UpdatePick.version("1.55"))
         assertEquals(listOf(2, 0, 17), UpdatePick.version("2.0.17"))
-        assertEquals(emptyList<Int>(), UpdatePick.version("2.0"))
+        assertEquals(emptyList<Int>(), UpdatePick.version("bad"))
     }
 }

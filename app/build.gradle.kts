@@ -20,7 +20,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = baseCode
-        versionName = "2.0.$run"
+        versionName = "1.$run"
     }
 
     splits {
