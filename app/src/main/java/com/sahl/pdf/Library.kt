@@ -287,6 +287,82 @@ object Library {
         return next
     }
 
+    // ---- shapes & free text ------------------------------------------------------------
+
+    data class ShapeEntry(
+        val id: String,
+        val page: Int,
+        val kind: String, // "rect", "circle", "arrow", "text"
+        val x1: Float,
+        val y1: Float,
+        val x2: Float,
+        val y2: Float,
+        val color: Int,
+        val width: Float,
+        val text: String = "",
+    )
+
+    private fun shapePrefs(c: Context) = c.getSharedPreferences("sahl_pdf_shapes", Context.MODE_PRIVATE)
+
+    fun shapes(c: Context, docKey: String): List<ShapeEntry> {
+        val raw = shapePrefs(c).getString(sha1(docKey), null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                ShapeEntry(
+                    o.getString("id"), o.getInt("page"), o.getString("kind"),
+                    o.getDouble("x1").toFloat(), o.getDouble("y1").toFloat(),
+                    o.getDouble("x2").toFloat(), o.getDouble("y2").toFloat(),
+                    o.getInt("color"), o.optDouble("w", 0.004).toFloat(), o.optString("text"),
+                )
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    private fun saveShapes(c: Context, docKey: String, list: List<ShapeEntry>) {
+        val arr = JSONArray()
+        list.forEach { s ->
+            arr.put(JSONObject().apply {
+                put("id", s.id); put("page", s.page); put("kind", s.kind)
+                put("x1", s.x1.toDouble()); put("y1", s.y1.toDouble())
+                put("x2", s.x2.toDouble()); put("y2", s.y2.toDouble())
+                put("color", s.color); put("w", s.width.toDouble()); put("text", s.text)
+            })
+        }
+        shapePrefs(c).edit().putString(sha1(docKey), arr.toString()).apply()
+    }
+
+    fun addShape(
+        c: Context,
+        docKey: String,
+        page: Int,
+        kind: String,
+        x1: Float,
+        y1: Float,
+        x2: Float,
+        y2: Float,
+        color: Int,
+        width: Float,
+        text: String = "",
+    ): ShapeEntry {
+        val s = ShapeEntry(java.util.UUID.randomUUID().toString(), page, kind, x1, y1, x2, y2, color, width, text)
+        saveShapes(c, docKey, shapes(c, docKey) + s)
+        return s
+    }
+
+    fun updateShapeText(c: Context, docKey: String, id: String, text: String): List<ShapeEntry> {
+        val next = shapes(c, docKey).map { if (it.id == id) it.copy(text = text) else it }
+        saveShapes(c, docKey, next)
+        return next
+    }
+
+    fun removeShape(c: Context, docKey: String, id: String): List<ShapeEntry> {
+        val next = shapes(c, docKey).filter { it.id != id }
+        saveShapes(c, docKey, next)
+        return next
+    }
+
     private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray())
         .joinToString("") { "%02x".format(it) }
 }

@@ -9,7 +9,7 @@ Sahl PDF 2 is a new app, written from scratch. It shares no code with earlier ve
 - **Send from phone** (on TV): open the local address and 6-digit code in any phone browser on the same Wi-Fi to send PDFs straight to `Download/Sahl PDF`.
 - **Recent** list with page thumbnails and reading progress. Each book reopens on the page where you stopped.
 - **Smooth reading**: continuous vertical scroll or horizontal page-by-page (left-to-right and right-to-left for Arabic books), **two-page spread**, fit width or fit whole page, fling, pinch and double-tap zoom, sharp text when zoomed in.
-- **Text selection, highlights & notes**: long-press and drag to select text, copy, highlight, or attach a note; tap highlights to read, edit, or remove; browse all notes from the menu.
+- **Text selection & Xodo-style annotations**: long-press with drag handles to select text, copy, highlight (5 colors), underline, strikethrough, squiggly, or attach formatted Sahl notes; **Annotate bar** with Pen, freehand Highlighter (works on scanned and locked PDFs), Rect, Circle, Arrow, Free Text, Sticky Notes, Eraser, and **Save annotated PDF**.
 - **Links**: tap internal PDF links to jump pages or external links to open in your browser.
 - **Search** inside the document with match highlights and next/previous navigation.
 - **Bookmarks**: bookmark pages and jump back to them anytime.
