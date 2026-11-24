@@ -147,6 +147,73 @@ object Library {
         saveBookmarks(c, docKey, bookmarks(c, docKey).filter { it.page != page })
     }
 
+    // ---- highlights & notes ------------------------------------------------------------
+
+    data class AnnotationEntry(
+        val id: String,
+        val page: Int,
+        val rects: List<NormRect>,
+        val text: String,
+        val note: String,
+        val added: Long,
+    )
+
+    private fun notePrefs(c: Context) = c.getSharedPreferences("sahl_pdf_notes", Context.MODE_PRIVATE)
+
+    fun annotations(c: Context, docKey: String): List<AnnotationEntry> {
+        val raw = notePrefs(c).getString(sha1(docKey), null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                val ra = o.getJSONArray("rects")
+                val rects = (0 until ra.length()).map { j ->
+                    val r = ra.getJSONObject(j)
+                    NormRect(
+                        r.getDouble("l").toFloat(), r.getDouble("t").toFloat(),
+                        r.getDouble("r").toFloat(), r.getDouble("b").toFloat(),
+                    )
+                }
+                AnnotationEntry(
+                    o.getString("id"), o.getInt("page"), rects,
+                    o.optString("text"), o.optString("note"), o.optLong("added"),
+                )
+            }.sortedBy { it.page }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    private fun saveAnnotations(c: Context, docKey: String, list: List<AnnotationEntry>) {
+        val arr = JSONArray()
+        list.sortedBy { it.page }.forEach { a ->
+            val ra = JSONArray()
+            a.rects.forEach { r ->
+                ra.put(JSONObject().apply {
+                    put("l", r.left.toDouble()); put("t", r.top.toDouble())
+                    put("r", r.right.toDouble()); put("b", r.bottom.toDouble())
+                })
+            }
+            arr.put(JSONObject().apply {
+                put("id", a.id); put("page", a.page); put("rects", ra)
+                put("text", a.text); put("note", a.note); put("added", a.added)
+            })
+        }
+        notePrefs(c).edit().putString(sha1(docKey), arr.toString()).apply()
+    }
+
+    fun addAnnotation(c: Context, docKey: String, page: Int, rects: List<NormRect>, text: String, note: String): AnnotationEntry {
+        val entry = AnnotationEntry(java.util.UUID.randomUUID().toString(), page, rects, text, note, System.currentTimeMillis())
+        saveAnnotations(c, docKey, annotations(c, docKey) + entry)
+        return entry
+    }
+
+    fun updateAnnotationNote(c: Context, docKey: String, id: String, note: String) {
+        saveAnnotations(c, docKey, annotations(c, docKey).map { if (it.id == id) it.copy(note = note) else it })
+    }
+
+    fun removeAnnotation(c: Context, docKey: String, id: String) {
+        saveAnnotations(c, docKey, annotations(c, docKey).filter { it.id != id })
+    }
+
     private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray())
         .joinToString("") { "%02x".format(it) }
 }

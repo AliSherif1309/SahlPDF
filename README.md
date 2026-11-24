@@ -4,11 +4,13 @@ A calm, fast PDF reader for Android phones and TVs, part of the Sahl apps family
 
 Sahl PDF 2 is a new app, written from scratch. It shares no code with earlier versions (those were built on MJ PDF; that code is kept only on the `legacy-mjpdf` tag). It's built step by step: each stage ships as a normal update.
 
-## Features (stage 3: TV edition)
+## Features (stage 4: text & notes)
 - **Open** from the file picker, from "Open with…" or "Share" in any app, or from the **On this device** list (needs file access, which you're asked for only there).
-- **Send from phone**: open the local address and 6-digit code in any phone browser on the same Wi-Fi to send PDFs straight to `Download/Sahl PDF`.
+- **Send from phone** (on TV): open the local address and 6-digit code in any phone browser on the same Wi-Fi to send PDFs straight to `Download/Sahl PDF`.
 - **Recent** list with page thumbnails and reading progress. Each book reopens on the page where you stopped.
 - **Smooth reading**: continuous vertical scroll or horizontal page-by-page (left-to-right and right-to-left for Arabic books), **two-page spread**, fit width or fit whole page, fling, pinch and double-tap zoom, sharp text when zoomed in.
+- **Text selection, highlights & notes**: long-press and drag to select text, copy, highlight, or attach a note; tap highlights to read, edit, or remove; browse all notes from the menu.
+- **Links**: tap internal PDF links to jump pages or external links to open in your browser.
 - **Search** inside the document with match highlights and next/previous navigation.
 - **Bookmarks**: bookmark pages and jump back to them anytime.
 - **Crop margins**: automatically trim white page margins for comfortable reading.
@@ -22,7 +24,6 @@ Sahl PDF 2 is a new app, written from scratch. It shares no code with earlier ve
 ## Coming next
 | Stage | Contents |
 |---|---|
-| 4. Text & notes | Text selection, links, highlights and notes |
 | 5. PDF tools | Organize pages, merge/split, document scanner |
 
 ## Install

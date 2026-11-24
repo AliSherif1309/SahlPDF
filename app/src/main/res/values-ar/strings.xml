@@ -66,4 +66,14 @@
     <string name="received_count">تم استلام: %d</string>
     <string name="tv_menu">قائمة القارئ</string>
     <string name="toolbars">إظهار / إخفاء الأشرطة</string>
+    <string name="copy">نسخ</string>
+    <string name="copied">تم النسخ</string>
+    <string name="highlight">تظليل</string>
+    <string name="add_note">ملاحظة</string>
+    <string name="edit_note">تعديل الملاحظة</string>
+    <string name="note_hint">اكتب ملاحظة…</string>
+    <string name="notes_title">التظليلات والملاحظات</string>
+    <string name="no_notes">لا توجد تظليلات أو ملاحظات بعد.</string>
+    <string name="delete">حذف</string>
+    <string name="open_link">فتح الرابط؟</string>
 </resources>
