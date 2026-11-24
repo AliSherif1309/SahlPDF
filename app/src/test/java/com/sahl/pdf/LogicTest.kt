@@ -111,4 +111,17 @@ class UpdatePickTest {
         assertEquals("SahlPDF-arm64-v8a-v1.58.apk", UpdatePick.choose(versioned, listOf("arm64-v8a"), 30040L))
         assertEquals("SahlPDF-v1.58.apk", UpdatePick.choose(versioned, listOf("x86_64"), 10001L))
     }
+
+    @Test fun mergesSameLineRects() {
+        val rects = listOf(
+            NormRect(0.10f, 0.20f, 0.20f, 0.23f),
+            NormRect(0.205f, 0.201f, 0.35f, 0.23f),
+            NormRect(0.10f, 0.30f, 0.25f, 0.33f),
+        )
+        val merged = NoteFormat.mergeLineRects(rects)
+        assertEquals(2, merged.size)
+        assertEquals(0.10f, merged[0].left, 0.001f)
+        assertEquals(0.35f, merged[0].right, 0.001f)
+        assertEquals(0.10f, merged[1].left, 0.001f)
+    }
 }
