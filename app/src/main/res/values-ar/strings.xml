@@ -95,5 +95,26 @@
     <string name="text_hint">اكتب النص…</string>
     <string name="save_annotated">حفظ نسخة مع التعليقات</string>
     <string name="saving_pdf">جارٍ الحفظ…</string>
-    <string name="saved_pdf">تم حفظ ملف PDF مع التعليقات</string>
+    <string name="saved_pdf">تم حفظ ملف PDF</string>
+    <string name="organize_pages">ترتيب الصفحات</string>
+    <string name="split_extract">تقسيم / استخراج</string>
+    <string name="split_hint">الصفحات (مثلاً 1-3، 5 من %1$d)</string>
+    <string name="invalid_range">أدخل أرقام صفحات صحيحة</string>
+    <string name="save_copy">حفظ PDF</string>
+    <string name="keep_one_page">يجب إبقاء صفحة واحدة على الأقل</string>
+    <string name="merge_pdfs">دمج ملفات PDF</string>
+    <string name="add_pdfs">إضافة ملفات</string>
+    <string name="merge_save">دمج وحفظ</string>
+    <string name="merge_empty">انقر "إضافة ملفات" لدمجها بالترتيب</string>
+    <string name="merge_need_two">أضف ملفين على الأقل للدمج</string>
+    <string name="page_count_label">%1$d صفحة</string>
+    <string name="scan_to_pdf">مسح ضوئي إلى PDF</string>
+    <string name="save_pdf">حفظ PDF</string>
+    <string name="take_photo">الكاميرا</string>
+    <string name="from_gallery">المعرض</string>
+    <string name="scan_empty">التقط صورة أو اختر صوراً لإنشاء ملف PDF</string>
+    <string name="filter_btn">فلتر</string>
+    <string name="filter_original">أصلي</string>
+    <string name="filter_enhanced">محسّن</string>
+    <string name="filter_bw">أبيض وأسود</string>
 </resources>

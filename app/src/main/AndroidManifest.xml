@@ -77,7 +77,28 @@
             android:configChanges="orientation|screenSize|screenLayout" />
 
         <activity
+            android:name=".OrganizePagesActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout" />
+
+        <activity
+            android:name=".MergeActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout" />
+
+        <activity
+            android:name=".ScanActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout" />
+
+        <activity
             android:name=".SahlCrashActivity"
             android:exported="false" />
+
+        <provider
+            android:name=".SahlFileProvider"
+            android:authorities="${applicationId}.scanprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>
