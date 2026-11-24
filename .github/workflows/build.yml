@@ -25,25 +25,23 @@ jobs:
           gradle testDebugUnitTest --no-daemon 2>&1 | tee test.log || {
             grep -E "^e: |error:|What went wrong|FAILED|Exception|Error:" -A2 test.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1; }
-      - name: Build (signed with the Sahl key when the secrets are available)
+      - name: Build (signed with the Sahl key when KEYSTORE_B64 is set)
         env:
-          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
         run: |
           set -o pipefail
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            export SIGNING_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            export KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
             echo "SIGNED=1" >> "$GITHUB_ENV"
           else
-            echo "::warning::Signing secrets not available: building with the debug key (not publishable)."
+            echo "::warning::KEYSTORE_B64 is not set: building with the debug key (not publishable)."
           fi
           gradle assembleRelease --no-daemon 2>&1 | tee build.log || {
             grep -E "^e: |error:|What went wrong|Error:" -A2 build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1; }
-          rm -f "$RUNNER_TEMP/release.jks"
+          rm -f "$RUNNER_TEMP/release.keystore"
           mkdir -p out
           d=app/build/outputs/apk/release
           ls -la "$d"

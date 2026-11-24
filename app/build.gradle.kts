@@ -32,13 +32,13 @@ android {
         }
     }
 
-    val ks = System.getenv("SIGNING_KEYSTORE_PATH")
+    val ks = System.getenv("KEYSTORE_FILE")
     signingConfigs {
         if (ks != null) create("sahl") {
             storeFile = file(ks)
-            storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-            keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-            keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            storePassword = System.getenv("KEYSTORE_PASS")
+            keyAlias = "sahl"
+            keyPassword = System.getenv("KEYSTORE_PASS")
         }
     }
 
