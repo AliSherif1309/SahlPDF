@@ -102,6 +102,51 @@ object Library {
         try { c.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
     }
 
+    // ---- bookmarks ---------------------------------------------------------------------
+
+    data class BookmarkEntry(val page: Int, val label: String, val added: Long)
+
+    private fun bookmarkPrefs(c: Context) = c.getSharedPreferences("sahl_pdf_bookmarks", Context.MODE_PRIVATE)
+
+    fun bookmarks(c: Context, docKey: String): List<BookmarkEntry> {
+        val raw = bookmarkPrefs(c).getString(sha1(docKey), null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                BookmarkEntry(o.getInt("page"), o.optString("label"), o.optLong("added"))
+            }.sortedBy { it.page }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    private fun saveBookmarks(c: Context, docKey: String, list: List<BookmarkEntry>) {
+        val arr = JSONArray()
+        list.sortedBy { it.page }.forEach { b ->
+            arr.put(JSONObject().apply {
+                put("page", b.page); put("label", b.label); put("added", b.added)
+            })
+        }
+        bookmarkPrefs(c).edit().putString(sha1(docKey), arr.toString()).apply()
+    }
+
+    fun isBookmarked(c: Context, docKey: String, page: Int): Boolean =
+        bookmarks(c, docKey).any { it.page == page }
+
+    fun toggleBookmark(c: Context, docKey: String, page: Int, label: String): Boolean {
+        val current = bookmarks(c, docKey)
+        return if (current.any { it.page == page }) {
+            saveBookmarks(c, docKey, current.filter { it.page != page })
+            false
+        } else {
+            saveBookmarks(c, docKey, current + BookmarkEntry(page, label, System.currentTimeMillis()))
+            true
+        }
+    }
+
+    fun removeBookmark(c: Context, docKey: String, page: Int) {
+        saveBookmarks(c, docKey, bookmarks(c, docKey).filter { it.page != page })
+    }
+
     private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray())
         .joinToString("") { "%02x".format(it) }
 }

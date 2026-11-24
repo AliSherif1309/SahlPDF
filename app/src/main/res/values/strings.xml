@@ -42,4 +42,21 @@
     <string name="licences">Open-source licences</string>
     <string name="licences_body">Sahl PDF — MIT licence.\n\nPDFium (Google / Foxit) — BSD 3-Clause licence.\nPdfiumAndroidKt (io.legere) — Apache License 2.0.\nKotlin standard library and coroutines (JetBrains) — Apache License 2.0.\nGuava (Google) — Apache License 2.0.</string>
     <string name="update_chip">Update</string>
+    <string name="search">Search</string>
+    <string name="search_hint">Search in document…</string>
+    <string name="search_count">%1$d / %2$d</string>
+    <string name="search_none">No matches</string>
+    <string name="bookmarks">Bookmarks</string>
+    <string name="bookmark_add">Bookmark this page</string>
+    <string name="bookmark_added">Bookmark added</string>
+    <string name="bookmark_removed">Bookmark removed</string>
+    <string name="no_bookmarks">No bookmarks yet.</string>
+    <string name="reading_mode">Reading direction</string>
+    <string name="mode_vertical">Vertical scroll</string>
+    <string name="mode_ltr">Horizontal (Left to right)</string>
+    <string name="mode_rtl">Horizontal (Right to left · Arabic)</string>
+    <string name="fit_mode">Page fit</string>
+    <string name="fit_width">Fit width</string>
+    <string name="fit_page">Fit whole page</string>
+    <string name="crop_margins">Crop margins</string>
 </resources>

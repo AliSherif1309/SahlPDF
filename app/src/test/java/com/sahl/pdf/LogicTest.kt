@@ -36,6 +36,26 @@ class PageLayoutTest {
         val l = PageLayout(listOf(PageSize(0f, 0f)), 0f).apply { layout(100f) }
         assertEquals(141.4f, l.height(0), 0.1f)
     }
+
+    @Test fun horizontalLtrAndRtlOrder() {
+        val ltr = PageLayout(pages, 10f).apply { layout(400f, 800f, FlowMode.HORIZONTAL_LTR, FitMode.PAGE) }
+        assertEquals(true, ltr.left(0) < ltr.left(1) && ltr.left(1) < ltr.left(2))
+
+        val rtl = PageLayout(pages, 10f).apply { layout(400f, 800f, FlowMode.HORIZONTAL_RTL, FitMode.PAGE) }
+        assertEquals(true, rtl.left(2) < rtl.left(1) && rtl.left(1) < rtl.left(0))
+        assertEquals(1, rtl.pageAt(rtl.left(1) + rtl.width(1) / 2f, 400f))
+    }
+
+    @Test fun marginCropDetectsContentBounds() {
+        val w = 100; val h = 100
+        val pixels = IntArray(w * h) { 0xFFFFFFFF.toInt() }
+        for (y in 20..79) for (x in 30..69) pixels[y * w + x] = 0xFF000000.toInt()
+        val crop = MarginCrop.detect(pixels, w, h, padFraction = 0.0f)
+        assertEquals(0.30f, crop.left, 0.02f)
+        assertEquals(0.20f, crop.top, 0.02f)
+        assertEquals(0.69f, crop.right, 0.02f)
+        assertEquals(0.79f, crop.bottom, 0.02f)
+    }
 }
 
 class UpdatePickTest {
