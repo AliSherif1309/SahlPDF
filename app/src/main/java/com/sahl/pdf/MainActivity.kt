@@ -57,6 +57,7 @@ class MainActivity : Activity() {
     private lateinit var bulkMergeBtn: TextView
     private lateinit var bulkShareBtn: TextView
     private lateinit var bulkRemoveBtn: TextView
+    private lateinit var bulkSelectAllBtn: TextView
     private var deviceTab = false
     private var allRows: List<Row> = emptyList()
     private var rows: List<Row> = emptyList()
@@ -277,30 +278,45 @@ class MainActivity : Activity() {
         root.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
 
         bulkBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(pal.card)
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
             visibility = View.GONE
         }
-        bulkCount = TextView(this).apply {
-            setTextColor(pal.text); textSize = 14f; typeface = Typeface.DEFAULT_BOLD
-        }
-        bulkBar.addView(bulkCount, LinearLayout.LayoutParams(0, -2, 1f))
         fun bulkBtn(labelRes: Int, bg: Int, fg: Int, click: () -> Unit) = TextView(this).apply {
             text = getString(labelRes)
-            setTextColor(fg); textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(fg); textSize = 13.5f; typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
             setPadding(dp(12), dp(8), dp(12), dp(8))
             Ui.focusable(this, bg, dp(14).toFloat(), pal.gold)
             setOnClickListener { click() }
         }
+        val bulkTop = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(8))
+        }
+        bulkCount = TextView(this).apply {
+            setTextColor(pal.text); textSize = 14.5f; typeface = Typeface.DEFAULT_BOLD
+            maxLines = 1
+        }
+        bulkSelectAllBtn = bulkBtn(R.string.select_all, pal.bg, pal.text) { toggleSelectAllRows() }
+        bulkTop.addView(bulkCount, LinearLayout.LayoutParams(0, -2, 1f))
+        bulkTop.addView(bulkSelectAllBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        bulkTop.addView(bulkBtn(R.string.done, pal.bg, pal.sub) { toggleMultiSelect(false) })
+        bulkBar.addView(bulkTop)
+
+        val bulkActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
         bulkMergeBtn = bulkBtn(R.string.merge_short, pal.accent, Color.WHITE) { mergeSelected() }
         bulkShareBtn = bulkBtn(R.string.share, pal.bg, pal.text) { shareSelected() }
         bulkRemoveBtn = bulkBtn(R.string.remove_recent, Color.parseColor("#B83B3B"), Color.WHITE) { removeSelected() }
-        bulkBar.addView(bulkMergeBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        bulkBar.addView(bulkShareBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        bulkBar.addView(bulkRemoveBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        bulkBar.addView(bulkBtn(R.string.done, pal.bg, pal.sub) { toggleMultiSelect(false) })
+        bulkActions.addView(bulkMergeBtn, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(6) })
+        bulkActions.addView(bulkShareBtn, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(6) })
+        bulkActions.addView(bulkRemoveBtn, LinearLayout.LayoutParams(0, -2, 1.3f))
+        bulkBar.addView(bulkActions)
         root.addView(bulkBar)
 
         setContentView(root)
@@ -398,11 +414,24 @@ class MainActivity : Activity() {
         return selectedUris.mapNotNull { byUri[it] }
     }
 
+    private fun toggleSelectAllRows() {
+        val allVisibleSelected = rows.isNotEmpty() && rows.all { selectedUris.contains(it.uri.toString()) }
+        if (allVisibleSelected) {
+            for (r in rows) selectedUris.remove(r.uri.toString())
+        } else {
+            for (r in rows) selectedUris.add(r.uri.toString())
+        }
+        updateBulkBar()
+        (list.adapter as BaseAdapter).notifyDataSetChanged()
+    }
+
     private fun updateBulkBar() {
         bulkBar.visibility = if (multiSelect) View.VISIBLE else View.GONE
         if (!multiSelect) return
         val sel = selectedRows()
         bulkCount.text = getString(R.string.selected_count, sel.size)
+        val allSel = rows.isNotEmpty() && rows.all { selectedUris.contains(it.uri.toString()) }
+        bulkSelectAllBtn.text = getString(if (allSel) R.string.deselect_all else R.string.select_all)
         bulkMergeBtn.visibility = if (sel.size >= 2) View.VISIBLE else View.GONE
         bulkShareBtn.visibility = if (sel.any { it.uri.scheme == "content" }) View.VISIBLE else View.GONE
         bulkRemoveBtn.visibility = if (!deviceTab && sel.any { it.book != null }) View.VISIBLE else View.GONE

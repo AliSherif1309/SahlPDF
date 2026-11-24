@@ -138,4 +138,6 @@
     <string name="export_images">تصدير الصفحات كصور</string>
     <string name="reverse_order">عكس ترتيب الصفحات</string>
     <string name="exported_count">تم حفظ %1$d ملفات</string>
+    <string name="capture_photo">التقاط</string>
+    <string name="camera_permission_needed">يلزم إذن الكاميرا لمسح المستندات ضوئياً</string>
 </resources>

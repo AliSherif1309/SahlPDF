@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <!-- Optional: lets the "On this device" list show every PDF (asked for only from that list). -->
     <uses-permission
@@ -15,6 +16,7 @@
     <uses-permission android:name="com.sahl.permission.UNION" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <queries>
@@ -91,6 +93,11 @@
 
         <activity
             android:name=".ScanActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout" />
+
+        <activity
+            android:name=".CameraScanActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout" />
 
