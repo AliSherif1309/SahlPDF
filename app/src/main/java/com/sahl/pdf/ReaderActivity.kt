@@ -9,8 +9,12 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.text.Editable
 import android.text.InputType
+import android.text.Spannable
+import android.text.TextWatcher
 import android.text.format.Formatter
+import android.text.style.StyleSpan
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -216,6 +220,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         topContainer.addView(searchBar, LinearLayout.LayoutParams(-1, -2))
 
         root.addView(topContainer, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        topContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> syncChromeInsets() }
 
         bottomBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -242,6 +247,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
         bottomBar.addView(seek, LinearLayout.LayoutParams(0, dp(40), 1f))
         root.addView(bottomBar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        bottomBar.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> syncChromeInsets() }
 
         pagePill = TextView(this).apply {
             setTextColor(Color.WHITE); textSize = 13f
@@ -352,10 +358,18 @@ class ReaderActivity : Activity(), PdfView.Listener {
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
     }
 
+    private fun syncChromeInsets() {
+        val topParent = topBar.parent as? View ?: return
+        val top = if (barsShown) topParent.height.toFloat() else 0f
+        val bottom = if (barsShown) bottomBar.height.toFloat() else 0f
+        pdfView.setChromeInsets(top, bottom)
+    }
+
     @Suppress("DEPRECATION")
     private fun setBars(show: Boolean) {
         if (show == barsShown) return
         barsShown = show
+        syncChromeInsets()
         val topParent = topBar.parent as View
         for (bar in listOf(topParent, bottomBar)) {
             if (show) {
@@ -785,7 +799,56 @@ class ReaderActivity : Activity(), PdfView.Listener {
             card.addView(quoteBox, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         }
 
-        val input = EditText(this).apply {
+        var boldOn = false
+        var italicOn = false
+        var formatting = false
+        lateinit var bBtn: TextView
+        lateinit var iBtn: TextView
+        lateinit var bulletBtn: TextView
+        lateinit var checkBtn: TextView
+        lateinit var input: EditText
+
+        fun styleBtn(btn: TextView, active: Boolean) {
+            Ui.focusable(btn, if (active) pal.accent else pal.card, dp(12).toFloat(), pal.gold)
+            btn.setTextColor(if (active) Color.WHITE else pal.text)
+        }
+
+        fun currentLineStartsWith(prefix: String): Boolean {
+            val edText = input.text ?: return false
+            val pos = input.selectionStart.coerceAtLeast(0)
+            val lineStart = edText.lastIndexOf('\n', (pos - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
+            return edText.subSequence(lineStart, minOf(edText.length, lineStart + prefix.length)).toString() == prefix
+        }
+
+        fun updateFmtButtons() {
+            styleBtn(bBtn, boldOn)
+            styleBtn(iBtn, italicOn)
+            styleBtn(bulletBtn, currentLineStartsWith("• "))
+            styleBtn(checkBtn, currentLineStartsWith("☐ ") || currentLineStartsWith("☑ "))
+        }
+
+        fun hasStyleAt(start: Int, end: Int, style: Int): Boolean {
+            val edText = input.text ?: return false
+            val a = minOf(start, end).coerceAtLeast(0)
+            val b = maxOf(start, end).coerceAtLeast(a)
+            if (a < b) {
+                return edText.getSpans(a, b, StyleSpan::class.java).any { it.style == style }
+            }
+            if (a > 0) {
+                return edText.getSpans(a - 1, a, StyleSpan::class.java).any { it.style == style }
+            }
+            return false
+        }
+
+        input = object : EditText(this) {
+            override fun onSelectionChanged(selStart: Int, selEnd: Int) {
+                super.onSelectionChanged(selStart, selEnd)
+                if (!::bBtn.isInitialized) return
+                boldOn = hasStyleAt(selStart, selEnd, Typeface.BOLD)
+                italicOn = hasStyleAt(selStart, selEnd, Typeface.ITALIC)
+                updateFmtButtons()
+            }
+        }.apply {
             setText(NoteFormat.decode(initialNote))
             hint = getString(R.string.note_hint)
             setTextColor(pal.text)
@@ -798,6 +861,30 @@ class ReaderActivity : Activity(), PdfView.Listener {
             isSingleLine = false
             background = Ui.rounded(pal.card, dp(16).toFloat(), dp(1), pal.divider)
             setPadding(dp(14), dp(12), dp(14), dp(12))
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    if (formatting || count <= 0 || s !is Spannable) return
+                    formatting = true
+                    val end = start + count
+                    for ((on, st) in listOf(boldOn to Typeface.BOLD, italicOn to Typeface.ITALIC)) {
+                        val existing = s.getSpans(start, end, StyleSpan::class.java).filter { it.style == st }
+                        if (on) {
+                            if (existing.isEmpty()) s.setSpan(StyleSpan(st), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        } else {
+                            for (sp in existing) {
+                                val ss = s.getSpanStart(sp)
+                                val se = s.getSpanEnd(sp)
+                                s.removeSpan(sp)
+                                if (ss < start) s.setSpan(StyleSpan(st), ss, start, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                                if (se > end) s.setSpan(StyleSpan(st), end, se, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            }
+                        }
+                    }
+                    formatting = false
+                }
+                override fun afterTextChanged(s: Editable?) {}
+            })
         }
 
         val fmtBar = LinearLayout(this).apply {
@@ -819,13 +906,37 @@ class ReaderActivity : Activity(), PdfView.Listener {
             Ui.focusable(this, pal.card, dp(12).toFloat(), pal.gold)
             setOnClickListener { click() }
         }
-        fmtBar.addView(fmtBtn("B", bold = true) { NoteFormat.toggleStyle(input, Typeface.BOLD) },
-            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        fmtBar.addView(fmtBtn("I", italic = true) { NoteFormat.toggleStyle(input, Typeface.ITALIC) },
-            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        fmtBar.addView(fmtBtn("•") { NoteFormat.toggleLinePrefix(input, "• ") },
-            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
-        fmtBar.addView(fmtBtn("☐") { NoteFormat.toggleLinePrefix(input, "☐ ") })
+        bBtn = fmtBtn("B", bold = true) {
+            if (input.selectionStart != input.selectionEnd) {
+                NoteFormat.toggleStyle(input, Typeface.BOLD)
+                boldOn = hasStyleAt(input.selectionStart, input.selectionEnd, Typeface.BOLD)
+            } else {
+                boldOn = !boldOn
+            }
+            updateFmtButtons()
+        }
+        iBtn = fmtBtn("I", italic = true) {
+            if (input.selectionStart != input.selectionEnd) {
+                NoteFormat.toggleStyle(input, Typeface.ITALIC)
+                italicOn = hasStyleAt(input.selectionStart, input.selectionEnd, Typeface.ITALIC)
+            } else {
+                italicOn = !italicOn
+            }
+            updateFmtButtons()
+        }
+        bulletBtn = fmtBtn("•") {
+            NoteFormat.toggleLinePrefix(input, "• ")
+            updateFmtButtons()
+        }
+        checkBtn = fmtBtn("☐") {
+            NoteFormat.toggleLinePrefix(input, "☐ ")
+            updateFmtButtons()
+        }
+        fmtBar.addView(bBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        fmtBar.addView(iBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        fmtBar.addView(bulletBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        fmtBar.addView(checkBtn)
+        updateFmtButtons()
         card.addView(fmtBar)
         card.addView(input, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
