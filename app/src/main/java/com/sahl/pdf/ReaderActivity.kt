@@ -37,6 +37,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private lateinit var pdfView: PdfView
     private lateinit var topBar: LinearLayout
     private lateinit var searchBar: LinearLayout
+    private lateinit var annotateBar: LinearLayout
     private lateinit var bottomBar: LinearLayout
     private lateinit var titleView: TextView
     private lateinit var bookmarkBtn: ImageView
@@ -172,12 +173,16 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
         topBar.addView(titleView, LinearLayout.LayoutParams(0, -2, 1f))
         topBar.addView(icon(R.drawable.ic_sahl_search, R.string.search) { openSearch() })
+        topBar.addView(icon(R.drawable.ic_annotate, R.string.annotate) { toggleAnnotateBar() })
         bookmarkBtn = icon(R.drawable.ic_bookmark, R.string.bookmark_add) { toggleCurrentBookmark() }
         topBar.addView(bookmarkBtn)
         topBar.addView(icon(R.drawable.ic_toc, R.string.contents) { showContents() })
         topBar.addView(icon(R.drawable.ic_night, R.string.night_pages) { toggleNight() })
         topBar.addView(icon(R.drawable.ic_sahl_more, R.string.settings_title) { showMenu(it) })
         topContainer.addView(topBar, LinearLayout.LayoutParams(-1, -2))
+
+        annotateBar = buildAnnotateBar()
+        topContainer.addView(annotateBar, LinearLayout.LayoutParams(-1, -2))
 
         searchBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -292,21 +297,28 @@ class ReaderActivity : Activity(), PdfView.Listener {
         refreshDots()
         selectionBar.addView(dotsRow)
 
-        val actionsRow = LinearLayout(this).apply {
+        val actionsRow = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+        }
+        val btns = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         fun selBtn(label: Int, click: () -> Unit) = TextView(this).apply {
             text = getString(label)
-            setTextColor(Color.WHITE); textSize = 13.5f; typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(12), dp(6), dp(12), dp(6))
+            setTextColor(Color.WHITE); textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(10), dp(6), dp(10), dp(6))
             Ui.focusable(this, Color.TRANSPARENT, dp(16).toFloat(), Color.parseColor("#F5C84C"))
             setOnClickListener { click() }
         }
-        actionsRow.addView(selBtn(R.string.copy) { copySelection() })
-        actionsRow.addView(selBtn(R.string.highlight) { saveSelection(withNote = false, color = activeColor) })
-        actionsRow.addView(selBtn(R.string.add_note) { saveSelection(withNote = true, color = activeColor) })
-        actionsRow.addView(icon(R.drawable.ic_close, android.R.string.cancel) { pdfView.clearSelection() })
+        btns.addView(selBtn(R.string.copy) { copySelection() })
+        btns.addView(selBtn(R.string.highlight) { saveSelection(withNote = false, color = activeColor, style = "highlight") })
+        btns.addView(selBtn(R.string.underline) { saveSelection(withNote = false, color = activeColor, style = "underline") })
+        btns.addView(selBtn(R.string.strikeout) { saveSelection(withNote = false, color = activeColor, style = "strikeout") })
+        btns.addView(selBtn(R.string.squiggly) { saveSelection(withNote = false, color = activeColor, style = "squiggly") })
+        btns.addView(selBtn(R.string.add_note) { saveSelection(withNote = true, color = activeColor, style = "highlight") })
+        btns.addView(icon(R.drawable.ic_close, android.R.string.cancel) { pdfView.clearSelection() })
+        actionsRow.addView(btns)
         selectionBar.addView(actionsRow)
 
         root.addView(selectionBar, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
@@ -410,6 +422,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         seek.max = d.pageCount - 1
         pdfView.setDocument(d, start)
         pdfView.setAnnotations(Library.annotations(this, key))
+        pdfView.setInks(Library.inks(this, key))
         updateLabel(start)
         Library.upsert(this, Book(key, uri.toString(), name, size, d.pageCount, start, System.currentTimeMillis()))
         val thumb = Library.thumb(this, key)
@@ -684,16 +697,16 @@ class ReaderActivity : Activity(), PdfView.Listener {
         pdfView.clearSelection()
     }
 
-    private fun saveSelection(withNote: Boolean, color: Int = 0x66F5C84C) {
+    private fun saveSelection(withNote: Boolean, color: Int = 0x66F5C84C, style: String = "highlight") {
         val sel = pdfView.selection ?: return
         if (!withNote) {
-            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, "", color)
+            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, "", color, style)
             pdfView.setAnnotations(Library.annotations(this, key))
             pdfView.clearSelection()
             return
         }
         showNoteEditor(R.string.add_note, sel.text, "") { note ->
-            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, note, color)
+            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, note, color, style)
             pdfView.setAnnotations(Library.annotations(this, key))
             pdfView.clearSelection()
         }
@@ -943,6 +956,130 @@ class ReaderActivity : Activity(), PdfView.Listener {
         dlg.show()
     }
 
+    // ---- Xodo-style annotate bar (Pen, Marker, Eraser, Sticky note, Undo, Colors) ------
+
+    private fun buildAnnotateBar(): LinearLayout {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(2), dp(8), dp(6))
+            visibility = View.GONE
+        }
+        val toolsScroll = android.widget.HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        val toolsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val penColors = intArrayOf(
+            0xFF0E6B4E.toInt(), // Sahl Emerald
+            0xFFF5C84C.toInt(), // Sahl Gold
+            0xFF2196F3.toInt(), // Blue
+            0xFFE53935.toInt(), // Red
+            0xFF111C18.toInt(), // Ink Black
+        )
+        val colorDots = ArrayList<View>()
+        val toolBtns = LinkedHashMap<PdfView.ToolMode, TextView>()
+
+        fun refreshAnnotateUi() {
+            for ((m, tv) in toolBtns) {
+                val active = pdfView.toolMode == m
+                tv.background = Ui.rounded(if (active) Color.parseColor("#0E6B4E") else Color.parseColor("#22FFFFFF"), dp(14).toFloat())
+                tv.setTextColor(Color.WHITE)
+            }
+            for (i in colorDots.indices) {
+                val c = penColors[i]
+                val sel = pdfView.penColor == c
+                colorDots[i].background = Ui.rounded(c, dp(11).toFloat(), if (sel) dp(2) else 0, Color.WHITE)
+            }
+        }
+
+        fun toolBtn(mode: PdfView.ToolMode, label: Int) = TextView(this).apply {
+            text = getString(label)
+            textSize = 12.5f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(11), dp(6), dp(11), dp(6))
+            setOnClickListener {
+                pdfView.toolMode = if (pdfView.toolMode == mode) PdfView.ToolMode.NONE else mode
+                refreshAnnotateUi()
+                if (pdfView.toolMode == PdfView.ToolMode.STICKY) {
+                    Toast.makeText(this@ReaderActivity, R.string.tap_to_place_note, Toast.LENGTH_SHORT).show()
+                }
+            }
+            toolBtns[mode] = this
+        }
+
+        val lp = { LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) } }
+        toolsRow.addView(toolBtn(PdfView.ToolMode.PEN, R.string.pen), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.MARKER, R.string.marker), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.ERASER, R.string.eraser), lp())
+        toolsRow.addView(toolBtn(PdfView.ToolMode.STICKY, R.string.sticky_note), lp())
+
+        toolsRow.addView(TextView(this).apply {
+            text = getString(R.string.undo)
+            textSize = 12.5f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
+            background = Ui.rounded(Color.parseColor("#22FFFFFF"), dp(14).toFloat())
+            setPadding(dp(11), dp(6), dp(11), dp(6))
+            setOnClickListener { pdfView.setInks(Library.undoInk(this@ReaderActivity, key)) }
+        }, lp())
+
+        for (c in penColors) {
+            val dot = View(this).apply {
+                setOnClickListener {
+                    pdfView.penColor = c
+                    if (pdfView.toolMode == PdfView.ToolMode.NONE || pdfView.toolMode == PdfView.ToolMode.ERASER) {
+                        pdfView.toolMode = PdfView.ToolMode.PEN
+                    }
+                    refreshAnnotateUi()
+                }
+            }
+            colorDots += dot
+            toolsRow.addView(dot, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(6) })
+        }
+
+        toolsRow.addView(TextView(this).apply {
+            text = getString(R.string.done)
+            textSize = 12.5f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#F5C84C"))
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener { toggleAnnotateBar(forceClose = true) }
+        })
+
+        refreshAnnotateUi()
+        toolsScroll.addView(toolsRow)
+        bar.addView(toolsScroll)
+        return bar
+    }
+
+    private fun toggleAnnotateBar(forceClose: Boolean = false) {
+        val open = if (forceClose) false else annotateBar.visibility != View.VISIBLE
+        if (open) {
+            setBars(true)
+            annotateBar.visibility = View.VISIBLE
+            if (pdfView.toolMode == PdfView.ToolMode.NONE) pdfView.toolMode = PdfView.ToolMode.PEN
+        } else {
+            annotateBar.visibility = View.GONE
+            pdfView.toolMode = PdfView.ToolMode.NONE
+        }
+    }
+
+    override fun onInkAdded(page: Int, color: Int, width: Float, points: List<Float>) {
+        Library.addInk(this, key, page, color, width, points)
+        pdfView.setInks(Library.inks(this, key))
+    }
+
+    override fun onInkErased(id: String) {
+        pdfView.setInks(Library.removeInk(this, key, id))
+    }
+
+    override fun onStickyTap(page: Int, nx: Float, ny: Float) {
+        val rect = NormRect(nx, ny, (nx + 0.04f).coerceAtMost(1f), (ny + 0.04f).coerceAtMost(1f))
+        showNoteEditor(R.string.sticky_note, "", "") { note ->
+            if (note.isNotBlank()) {
+                Library.addAnnotation(this, key, page, listOf(rect), getString(R.string.sticky_note), note, 0xFFF5C84C.toInt(), "sticky")
+                pdfView.setAnnotations(Library.annotations(this, key))
+            }
+            toggleAnnotateBar(forceClose = true)
+        }
+    }
+
     // ---- keys (TV remote, keyboards) -----------------------------------------------------
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -973,6 +1110,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
     }
 
     override fun onBackPressed() {
+        if (::annotateBar.isInitialized && annotateBar.visibility == View.VISIBLE) { toggleAnnotateBar(forceClose = true); return }
         if (searchOpen) { closeSearch(); return }
         if (!barsShown && Ui.isTv(this)) { setBars(true); return }
         @Suppress("DEPRECATION")

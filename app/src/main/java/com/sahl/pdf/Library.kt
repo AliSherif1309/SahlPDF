@@ -157,6 +157,7 @@ object Library {
         val note: String,
         val color: Int,
         val added: Long,
+        val style: String = "highlight",
     )
 
     private fun notePrefs(c: Context) = c.getSharedPreferences("sahl_pdf_notes", Context.MODE_PRIVATE)
@@ -179,6 +180,7 @@ object Library {
                     o.getString("id"), o.getInt("page"), rects,
                     o.optString("text"), o.optString("note"),
                     o.optInt("color", 0x66F5C84C), o.optLong("added"),
+                    o.optString("style", "highlight"),
                 )
             }.sortedBy { it.page }
         } catch (_: Exception) { emptyList() }
@@ -196,7 +198,8 @@ object Library {
             }
             arr.put(JSONObject().apply {
                 put("id", a.id); put("page", a.page); put("rects", ra)
-                put("text", a.text); put("note", a.note); put("color", a.color); put("added", a.added)
+                put("text", a.text); put("note", a.note); put("color", a.color)
+                put("added", a.added); put("style", a.style)
             })
         }
         notePrefs(c).edit().putString(sha1(docKey), arr.toString()).apply()
@@ -210,8 +213,9 @@ object Library {
         text: String,
         note: String,
         color: Int = 0x66F5C84C,
+        style: String = "highlight",
     ): AnnotationEntry {
-        val entry = AnnotationEntry(java.util.UUID.randomUUID().toString(), page, rects, text, note, color, System.currentTimeMillis())
+        val entry = AnnotationEntry(java.util.UUID.randomUUID().toString(), page, rects, text, note, color, System.currentTimeMillis(), style)
         saveAnnotations(c, docKey, annotations(c, docKey) + entry)
         return entry
     }
@@ -222,6 +226,65 @@ object Library {
 
     fun removeAnnotation(c: Context, docKey: String, id: String) {
         saveAnnotations(c, docKey, annotations(c, docKey).filter { it.id != id })
+    }
+
+    // ---- freehand ink strokes ----------------------------------------------------------
+
+    data class InkStroke(
+        val id: String,
+        val page: Int,
+        val color: Int,
+        val width: Float,
+        val points: List<Float>, // flat [x0, y0, x1, y1, ...] in normalized [0..1] page coords
+    )
+
+    private fun inkPrefs(c: Context) = c.getSharedPreferences("sahl_pdf_inks", Context.MODE_PRIVATE)
+
+    fun inks(c: Context, docKey: String): List<InkStroke> {
+        val raw = inkPrefs(c).getString(sha1(docKey), null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(raw)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                val pa = o.getJSONArray("pts")
+                val pts = ArrayList<Float>(pa.length())
+                for (j in 0 until pa.length()) pts += pa.getDouble(j).toFloat()
+                InkStroke(o.getString("id"), o.getInt("page"), o.getInt("color"), o.optDouble("w", 0.004).toFloat(), pts)
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    private fun saveInks(c: Context, docKey: String, list: List<InkStroke>) {
+        val arr = JSONArray()
+        list.forEach { s ->
+            val pa = JSONArray()
+            s.points.forEach { pa.put(it.toDouble()) }
+            arr.put(JSONObject().apply {
+                put("id", s.id); put("page", s.page); put("color", s.color)
+                put("w", s.width.toDouble()); put("pts", pa)
+            })
+        }
+        inkPrefs(c).edit().putString(sha1(docKey), arr.toString()).apply()
+    }
+
+    fun addInk(c: Context, docKey: String, page: Int, color: Int, width: Float, points: List<Float>): InkStroke {
+        val stroke = InkStroke(java.util.UUID.randomUUID().toString(), page, color, width, points)
+        saveInks(c, docKey, inks(c, docKey) + stroke)
+        return stroke
+    }
+
+    fun undoInk(c: Context, docKey: String): List<InkStroke> {
+        val cur = inks(c, docKey)
+        if (cur.isEmpty()) return cur
+        val next = cur.dropLast(1)
+        saveInks(c, docKey, next)
+        return next
+    }
+
+    fun removeInk(c: Context, docKey: String, id: String): List<InkStroke> {
+        val next = inks(c, docKey).filter { it.id != id }
+        saveInks(c, docKey, next)
+        return next
     }
 
     private fun sha1(s: String) = MessageDigest.getInstance("SHA-1").digest(s.toByteArray())
