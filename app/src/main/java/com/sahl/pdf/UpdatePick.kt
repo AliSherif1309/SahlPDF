@@ -9,11 +9,16 @@ object UpdatePick {
 
     /** Returns the asset name to download, or null when nothing newer fits this device. */
     fun choose(apkCodes: Map<String, Long>, deviceAbis: List<String>, installedCode: Long): String? {
-        for (name in preferredNames(deviceAbis)) {
-            val code = apkCodes[name] ?: continue
-            return if (code > installedCode) name else null
+        for (abi in deviceAbis.filter { it in knownAbis }) {
+            val prefix = "SahlPDF-$abi"
+            val match = apkCodes.keys.firstOrNull { it == "$prefix.apk" || (it.startsWith("$prefix-v") && it.endsWith(".apk")) }
+            if (match != null) {
+                return if (apkCodes.getValue(match) > installedCode) match else null
+            }
         }
-        return null
+        val uni = apkCodes.keys.firstOrNull { it == "SahlPDF.apk" || (it.startsWith("SahlPDF-v") && it.endsWith(".apk")) }
+            ?: return null
+        return if (apkCodes.getValue(uni) > installedCode) uni else null
     }
 
     /** "1.55" or "2.0.17" -> [1, 55] / [2, 0, 17]; anything unparsable -> empty. */

@@ -45,8 +45,9 @@ jobs:
           mkdir -p out
           d=app/build/outputs/apk/release
           ls -la "$d"
-          cp "$d"/app-universal-release.apk out/SahlPDF.apk
-          for abi in armeabi-v7a arm64-v8a x86 x86_64; do cp "$d"/app-$abi-release.apk out/SahlPDF-$abi.apk; done
+          VER="v1.$GITHUB_RUN_NUMBER"
+          cp "$d"/app-universal-release.apk "out/SahlPDF-$VER.apk"
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do cp "$d"/app-$abi-release.apk "out/SahlPDF-$abi-$VER.apk"; done
       - name: Updater metadata
         env:
           MSG: ${{ github.event.head_commit.message || github.event.pull_request.title }}
@@ -69,7 +70,7 @@ jobs:
           TAG="v1.$GITHUB_RUN_NUMBER"
           TITLE="Sahl PDF $TAG"
           FIRST_LINE=$(printf '%s\n' "$MSG" | head -n 1)
-          NOTES="$FIRST_LINE"$'\n\n'"Phones: SahlPDF-arm64-v8a.apk · Mi TV / 32-bit: SahlPDF-armeabi-v7a.apk · Universal: SahlPDF.apk"
+          NOTES="$FIRST_LINE"$'\n\n'"Phones: SahlPDF-arm64-v8a-$TAG.apk · Mi TV / 32-bit: SahlPDF-armeabi-v7a-$TAG.apk · Universal: SahlPDF-$TAG.apk"
           gh release create "$TAG" out/*.apk out/version.json out/SHA256SUMS --target "$GITHUB_SHA" \
             --title "$TITLE" --notes "$NOTES" --latest
           # Stable download links: .../releases/download/latest/SahlPDF.apk
