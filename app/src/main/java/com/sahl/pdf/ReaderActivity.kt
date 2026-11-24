@@ -802,6 +802,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         var boldOn = false
         var italicOn = false
         var formatting = false
+        var ready = false
         lateinit var bBtn: TextView
         lateinit var iBtn: TextView
         lateinit var bulletBtn: TextView
@@ -821,6 +822,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
 
         fun updateFmtButtons() {
+            if (!ready) return
             styleBtn(bBtn, boldOn)
             styleBtn(iBtn, italicOn)
             styleBtn(bulletBtn, currentLineStartsWith("• "))
@@ -843,7 +845,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         input = object : EditText(this) {
             override fun onSelectionChanged(selStart: Int, selEnd: Int) {
                 super.onSelectionChanged(selStart, selEnd)
-                if (!::bBtn.isInitialized) return
+                if (!ready) return
                 boldOn = hasStyleAt(selStart, selEnd, Typeface.BOLD)
                 italicOn = hasStyleAt(selStart, selEnd, Typeface.ITALIC)
                 updateFmtButtons()
@@ -936,6 +938,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         fmtBar.addView(iBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
         fmtBar.addView(bulletBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
         fmtBar.addView(checkBtn)
+        ready = true
         updateFmtButtons()
         card.addView(fmtBar)
         card.addView(input, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
