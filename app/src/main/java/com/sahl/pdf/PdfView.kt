@@ -112,6 +112,18 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private var shapeX1 = 0f; private var shapeY1 = 0f; private var shapeX2 = 0f; private var shapeY2 = 0f
     private val linksCache = HashMap<Int, List<PageLink>>()
     private val linksPending = HashSet<Int>()
+    private var topInsetPx = 0f
+    private var bottomInsetPx = 0f
+
+    fun setChromeInsets(top: Float, bottom: Float) {
+        if (topInsetPx == top && bottomInsetPx == bottom) return
+        val wasAtTop = sy <= minY() + 2f * dp
+        topInsetPx = top
+        bottomInsetPx = bottom
+        if (wasAtTop) sy = minY()
+        clamp()
+        invalidate()
+    }
 
     private val scroller = OverScroller(context)
     private var zoomAnim: ValueAnimator? = null
@@ -232,10 +244,11 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         if (width <= 0 || height <= 0) { pendingPage = p; pendingFraction = 0f; return }
         stopMotion()
         if (flowMode == FlowMode.VERTICAL) {
-            sy = l.top(p) * zoom - 6 * dp
+            sy = l.top(p) * zoom - 6 * dp - topInsetPx
         } else {
             sx = l.snapX(p) * zoom
-            sy = max(0f, l.top(p) * zoom - (height - l.height(p) * zoom) / 2f)
+            val visibleH = max(1f, height - topInsetPx - bottomInsetPx)
+            sy = max(minY(), l.top(p) * zoom - topInsetPx - (visibleH - l.height(p) * zoom) / 2f)
         }
         clamp(); notifyPage(); invalidate()
     }
@@ -263,7 +276,7 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
 
     fun scrollByAnimated(dy: Float) {
         stopMotion()
-        val target = (sy + dy).coerceIn(0f, maxY())
+        val target = (sy + dy).coerceIn(minY(), maxY())
         scroller.startScroll(sx.roundToInt(), sy.roundToInt(), 0, (target - sy).roundToInt(), 220)
         postInvalidateOnAnimation()
     }
@@ -316,19 +329,25 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             val p = pendingPage.coerceIn(0, l.count - 1)
             if (flowMode == FlowMode.VERTICAL) {
                 sx = max(0f, (l.totalWidth * zoom - width) / 2f)
-                sy = (l.top(p) + pendingFraction * l.height(p)) * zoom - if (pendingFraction == 0f) 6 * dp else 0f
+                sy = (l.top(p) + pendingFraction * l.height(p)) * zoom - (if (pendingFraction == 0f) 6 * dp else 0f) - topInsetPx
             } else {
                 sx = l.snapX(p) * zoom
-                sy = 0f
+                val visibleH = max(1f, height - topInsetPx - bottomInsetPx)
+                sy = max(minY(), l.top(p) * zoom - topInsetPx - (visibleH - l.height(p) * zoom) / 2f)
             }
             pendingPage = -1
         }
         clamp(); notifyPage(); invalidate()
     }
 
+    private fun minY() = -topInsetPx
     private fun maxX() = max(0f, (layout?.totalWidth ?: 0f) * zoom - width)
-    private fun maxY() = max(0f, (layout?.totalHeight ?: 0f) * zoom - height)
-    private fun clamp() { sx = sx.coerceIn(0f, maxX()); sy = sy.coerceIn(0f, maxY()) }
+    private fun maxY(): Float {
+        val contentH = (layout?.totalHeight ?: 0f) * zoom
+        val visibleH = max(1f, height - topInsetPx - bottomInsetPx)
+        return if (contentH <= visibleH) minY() else max(minY(), contentH - (height - bottomInsetPx))
+    }
+    private fun clamp() { sx = sx.coerceIn(0f, maxX()); sy = sy.coerceIn(minY(), maxY()) }
 
     private fun notifyPage() {
         val l = layout ?: return
@@ -592,7 +611,7 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
                 return true
             }
             scroller.fling(sx.roundToInt(), sy.roundToInt(), -vx.roundToInt(), -vy.roundToInt(),
-                0, maxX().roundToInt(), 0, maxY().roundToInt())
+                0, maxX().roundToInt(), minY().roundToInt(), maxY().roundToInt())
             postInvalidateOnAnimation(); return true
         }
         override fun onLongPress(e: MotionEvent) {
