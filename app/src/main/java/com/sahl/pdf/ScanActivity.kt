@@ -204,11 +204,27 @@ class ScanActivity : Activity() {
         val file = File(scanDir(), "scan_${System.currentTimeMillis()}.jpg")
         pendingPhotoFile = file
         val uri = SahlFileProvider.uriFor(this, file)
-        val i = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            .putExtra(MediaStore.EXTRA_OUTPUT, uri)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        try { startActivityForResult(i, REQ_CAMERA) } catch (_: Exception) {
-            Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+        val i = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+            putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            clipData = android.content.ClipData.newRawUri("", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }
+        try {
+            val handlers = packageManager.queryIntentActivities(i, 0)
+            for (ri in handlers) {
+                grantUriPermission(
+                    ri.activityInfo.packageName,
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            startActivityForResult(i, REQ_CAMERA)
+        } catch (e: Exception) {
+            try {
+                startActivityForResult(Intent(MediaStore.ACTION_IMAGE_CAPTURE), REQ_CAMERA)
+            } catch (e2: Exception) {
+                Toast.makeText(this, e2.localizedMessage ?: e.localizedMessage ?: getString(R.string.cannot_open), Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -242,8 +258,17 @@ class ScanActivity : Activity() {
         if (resultCode != RESULT_OK) return
         when (requestCode) {
             REQ_CAMERA -> {
-                val f = pendingPhotoFile
-                if (f != null && f.exists() && f.length() > 0L) {
+                val f = pendingPhotoFile ?: return
+                if (!f.exists() || f.length() == 0L) {
+                    @Suppress("DEPRECATION")
+                    val bmp = data?.extras?.get("data") as? Bitmap
+                    if (bmp != null) {
+                        try {
+                            FileOutputStream(f).use { bmp.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                        } catch (_: Throwable) { }
+                    }
+                }
+                if (f.exists() && f.length() > 0L) {
                     pages += PdfTools.ScanPage(f.path, 0, PdfTools.ScanFilter.ENHANCED)
                     selected = pages.lastIndex
                     refresh()

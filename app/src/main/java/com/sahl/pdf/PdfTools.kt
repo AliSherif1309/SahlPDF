@@ -229,6 +229,65 @@ object PdfTools {
         return out
     }
 
+    /** Compresses [doc] by downsampling and JPEG-recompressing each page to reduce file size. */
+    fun compressPdf(doc: PdfDoc, maxSidePx: Int, jpegQuality: Int, out: OutputStream) {
+        val pdf = PdfDocument()
+        val baos = java.io.ByteArrayOutputStream()
+        try {
+            for (i in 0 until doc.pageCount) {
+                val sz = doc.sizes[i]
+                val pw = max(1, sz.width.roundToInt())
+                val ph = max(1, sz.height.roundToInt())
+                val scale = (maxSidePx.toFloat() / max(pw, ph)).coerceIn(0.4f, 1.5f)
+                val bw = max(1, (pw * scale).roundToInt())
+                val bh = max(1, (ph * scale).roundToInt())
+                val raw = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)
+                var compressed: Bitmap? = null
+                try {
+                    doc.render(i, raw, 0, 0, bw, bh)
+                    baos.reset()
+                    raw.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(25, 95), baos)
+                    val bytes = baos.toByteArray()
+                    compressed = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    val page = pdf.startPage(PdfDocument.PageInfo.Builder(pw, ph, i + 1).create())
+                    page.canvas.drawBitmap(compressed ?: raw, null, RectF(0f, 0f, pw.toFloat(), ph.toFloat()), null)
+                    pdf.finishPage(page)
+                } finally {
+                    raw.recycle()
+                    compressed?.recycle()
+                }
+            }
+            pdf.writeTo(out)
+        } finally {
+            pdf.close()
+        }
+    }
+
+    /** Exports a single [pageIndex] (with optional [rotationDeg]) as a high-res JPEG image. */
+    fun exportPageAsJpeg(doc: PdfDoc, pageIndex: Int, rotationDeg: Int, out: OutputStream) {
+        if (pageIndex !in 0 until doc.pageCount) return
+        val sz = doc.sizes[pageIndex]
+        val baseW = max(1, sz.width.roundToInt())
+        val baseH = max(1, sz.height.roundToInt())
+        val scale = (1800f / max(baseW, baseH)).coerceIn(1f, 3f)
+        val bw = max(1, (baseW * scale).roundToInt())
+        val bh = max(1, (baseH * scale).roundToInt())
+        val raw = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)
+        val bmp = try {
+            doc.render(pageIndex, raw, 0, 0, bw, bh)
+            val rot = ((rotationDeg % 360) + 360) % 360
+            if (rot == 0) raw else rotateBitmap(raw, rot).also { raw.recycle() }
+        } catch (t: Throwable) {
+            raw.recycle()
+            throw t
+        }
+        try {
+            bmp.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        } finally {
+            bmp.recycle()
+        }
+    }
+
     private fun rotateBitmap(bmp: Bitmap, deg: Int): Bitmap {
         val m = Matrix().apply { postRotate(deg.toFloat()) }
         return Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)

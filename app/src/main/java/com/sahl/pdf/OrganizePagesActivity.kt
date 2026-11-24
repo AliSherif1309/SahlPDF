@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.text.InputType
 import android.util.LruCache
 import android.view.Gravity
@@ -26,7 +27,12 @@ import android.widget.Toast
 import java.util.concurrent.Executors
 
 /**
- * Visual page organizer: reorder, rotate, delete, split/extract ranges, and save a new PDF copy.
+ * Visual page organizer & PDF tools:
+ * - Multi-select & Select All
+ * - Reorder, rotate 90°, delete, save a copy
+ * - Extract selected/range OR Split whole PDF into a folder
+ * - Export pages as JPEG images
+ * - Compress PDF
  */
 class OrganizePagesActivity : Activity() {
 
@@ -34,6 +40,7 @@ class OrganizePagesActivity : Activity() {
     private lateinit var grid: GridView
     private lateinit var progress: ProgressBar
     private lateinit var titleView: TextView
+    private lateinit var selectAllBtn: TextView
     private val io = Executors.newFixedThreadPool(2)
     private val thumbs = LruCache<Int, Bitmap>(16 * 1024 * 1024)
 
@@ -42,8 +49,14 @@ class OrganizePagesActivity : Activity() {
     private var docName = "document"
     private var password: String? = null
     private val pages = ArrayList<PdfTools.PageSpec>()
-    private var selectedPos = 0
+    private val selected = LinkedHashSet<Int>()
+
     private var pendingExportPages: List<PdfTools.PageSpec>? = null
+    private var pendingCompress: Pair<Int, Int>? = null // maxSidePx to jpegQuality
+    private var pendingTreeMode: TreeMode = TreeMode.SPLIT_WHOLE
+    private var pendingSplitChunk = 1
+
+    private enum class TreeMode { SPLIT_WHOLE, EXPORT_IMAGES }
 
     private fun dp(v: Number) = Ui.dp(this, v)
 
@@ -74,7 +87,7 @@ class OrganizePagesActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), dp(10), dp(12), dp(8))
+            setPadding(dp(8), dp(10), dp(12), dp(6))
         }
         header.addView(ImageView(this).apply {
             setImageResource(R.drawable.ic_back)
@@ -93,23 +106,34 @@ class OrganizePagesActivity : Activity() {
         }
         header.addView(titleView, LinearLayout.LayoutParams(0, -2, 1f))
 
-        header.addView(actionPill(getString(R.string.split_extract), pal.card, pal.text) { askSplitRange() },
-            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
         header.addView(actionPill(getString(R.string.save_copy), pal.accent, Color.WHITE) {
-            startSave(pages.toList(), "${docName.removeSuffix(".pdf").removeSuffix(".PDF")}-organized.pdf")
+            startSave(pages.toList(), "${baseName()}-organized.pdf")
         })
         root.addView(header)
+
+        val toolsStrip = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), 0, dp(12), dp(8))
+        }
+        selectAllBtn = actionPill(getString(R.string.select_all), pal.card, pal.text) { toggleSelectAll() }
+        toolsStrip.addView(selectAllBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        toolsStrip.addView(actionPill(getString(R.string.split_extract), pal.card, pal.text) { showSplitDialog() },
+            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        toolsStrip.addView(actionPill(getString(R.string.more_tools), pal.card, pal.text) { showMoreTools() })
+        root.addView(toolsStrip)
 
         val body = FrameLayout(this)
         grid = GridView(this).apply {
             numColumns = if (resources.configuration.screenWidthDp >= 600) 4 else 3
             horizontalSpacing = dp(10)
             verticalSpacing = dp(10)
-            setPadding(dp(12), dp(8), dp(12), dp(12))
+            setPadding(dp(12), dp(4), dp(12), dp(12))
             clipToPadding = false
             adapter = PageAdapter()
             setOnItemClickListener { _, _, pos, _ ->
-                selectedPos = pos
+                if (!selected.add(pos)) selected.remove(pos)
+                updateHeader()
                 (adapter as BaseAdapter).notifyDataSetChanged()
             }
         }
@@ -137,13 +161,15 @@ class OrganizePagesActivity : Activity() {
         setContentView(root)
     }
 
+    private fun baseName() = docName.removeSuffix(".pdf").removeSuffix(".PDF")
+
     private fun actionPill(label: String, bg: Int, fg: Int, click: () -> Unit) = TextView(this).apply {
         text = label
         setTextColor(fg)
-        textSize = 13.5f
+        textSize = 13f
         typeface = Typeface.DEFAULT_BOLD
         gravity = Gravity.CENTER
-        setPadding(dp(12), dp(9), dp(12), dp(9))
+        setPadding(dp(11), dp(8), dp(11), dp(8))
         Ui.focusable(this, bg, dp(14).toFloat(), pal.gold)
         setOnClickListener { click() }
     }
@@ -162,47 +188,130 @@ class OrganizePagesActivity : Activity() {
                 doc = opened
                 pages.clear()
                 for (i in 0 until opened.pageCount) pages += PdfTools.PageSpec(i, 0)
-                selectedPos = 0
-                updateTitle()
+                selected.clear()
+                if (pages.isNotEmpty()) selected += 0
+                updateHeader()
                 (grid.adapter as BaseAdapter).notifyDataSetChanged()
             }
         }
     }
 
-    private fun updateTitle() {
-        titleView.text = "${getString(R.string.organize_pages)} (${pages.size})"
+    private fun updateHeader() {
+        titleView.text = if (selected.isEmpty()) "${getString(R.string.organize_pages)} (${pages.size})"
+        else "${getString(R.string.organize_pages)} · ${selected.size}/${pages.size}"
+        val allSelected = pages.isNotEmpty() && selected.size == pages.size
+        selectAllBtn.text = getString(if (allSelected) R.string.deselect_all else R.string.select_all)
+    }
+
+    private fun toggleSelectAll() {
+        if (pages.isEmpty()) return
+        if (selected.size == pages.size) selected.clear()
+        else {
+            selected.clear()
+            for (i in pages.indices) selected += i
+        }
+        updateHeader()
+        (grid.adapter as BaseAdapter).notifyDataSetChanged()
     }
 
     private fun moveSelected(delta: Int) {
-        if (selectedPos !in pages.indices) return
-        val next = selectedPos + delta
-        if (next !in pages.indices) return
-        val item = pages.removeAt(selectedPos)
-        pages.add(next, item)
-        selectedPos = next
+        if (selected.isEmpty()) return
+        val sorted = if (delta < 0) selected.sorted() else selected.sortedDescending()
+        val nextSel = LinkedHashSet<Int>()
+        for (pos in sorted) {
+            val target = pos + delta
+            if (target !in pages.indices || (target in selected && target !in nextSel)) {
+                nextSel += pos
+                continue
+            }
+            val item = pages.removeAt(pos)
+            pages.add(target, item)
+            nextSel += target
+        }
+        selected.clear()
+        selected += nextSel
+        updateHeader()
         (grid.adapter as BaseAdapter).notifyDataSetChanged()
     }
 
     private fun rotateSelected() {
-        if (selectedPos !in pages.indices) return
-        val cur = pages[selectedPos]
-        pages[selectedPos] = cur.copy(rotationDeg = (cur.rotationDeg + 90) % 360)
+        if (selected.isEmpty()) return
+        for (pos in selected) {
+            if (pos in pages.indices) {
+                val cur = pages[pos]
+                pages[pos] = cur.copy(rotationDeg = (cur.rotationDeg + 90) % 360)
+            }
+        }
         (grid.adapter as BaseAdapter).notifyDataSetChanged()
     }
 
     private fun deleteSelected() {
-        if (pages.size <= 1) {
+        if (selected.isEmpty()) return
+        if (pages.size - selected.size < 1) {
             Toast.makeText(this, R.string.keep_one_page, Toast.LENGTH_SHORT).show()
             return
         }
-        if (selectedPos !in pages.indices) return
-        pages.removeAt(selectedPos)
-        if (selectedPos >= pages.size) selectedPos = pages.lastIndex
-        updateTitle()
+        for (pos in selected.sortedDescending()) {
+            if (pos in pages.indices) pages.removeAt(pos)
+        }
+        selected.clear()
+        if (pages.isNotEmpty()) selected += 0
+        updateHeader()
         (grid.adapter as BaseAdapter).notifyDataSetChanged()
     }
 
-    private fun askSplitRange() {
+    private fun showSplitDialog() {
+        val opts = arrayOf(
+            getString(R.string.split_whole_pdf),
+            getString(R.string.split_every_n),
+            getString(R.string.extract_range),
+            getString(R.string.extract_selected),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.split_extract)
+            .setItems(opts) { _, which ->
+                when (which) {
+                    0 -> {
+                        pendingTreeMode = TreeMode.SPLIT_WHOLE
+                        pendingSplitChunk = 1
+                        pickOutputFolder()
+                    }
+                    1 -> askSplitChunkSize()
+                    2 -> askExtractRange()
+                    3 -> {
+                        val specs = selected.sorted().mapNotNull { pages.getOrNull(it) }
+                        if (specs.isEmpty()) Toast.makeText(this, R.string.select_pages_first, Toast.LENGTH_SHORT).show()
+                        else startSave(specs, "${baseName()}-extracted.pdf")
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun askSplitChunkSize() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.split_every_n_hint)
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText("2")
+            setTextColor(pal.text)
+            setHintTextColor(pal.sub)
+        }
+        val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.split_every_n)
+            .setView(box)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val n = (input.text.toString().toIntOrNull() ?: 1).coerceAtLeast(1)
+                pendingTreeMode = TreeMode.SPLIT_WHOLE
+                pendingSplitChunk = n
+                pickOutputFolder()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun askExtractRange() {
         val d = doc ?: return
         val input = EditText(this).apply {
             hint = getString(R.string.split_hint, d.pageCount)
@@ -212,7 +321,7 @@ class OrganizePagesActivity : Activity() {
         }
         val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
         AlertDialog.Builder(this)
-            .setTitle(R.string.split_extract)
+            .setTitle(R.string.extract_range)
             .setView(box)
             .setPositiveButton(R.string.save_copy) { _, _ ->
                 val indices = PdfTools.parsePageRanges(input.text.toString(), d.pageCount)
@@ -220,16 +329,74 @@ class OrganizePagesActivity : Activity() {
                     Toast.makeText(this, R.string.invalid_range, Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                val specs = indices.map { PdfTools.PageSpec(it, 0) }
-                startSave(specs, "${docName.removeSuffix(".pdf").removeSuffix(".PDF")}-split.pdf")
+                startSave(indices.map { PdfTools.PageSpec(it, 0) }, "${baseName()}-split.pdf")
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
+    private fun showMoreTools() {
+        val opts = arrayOf(
+            getString(R.string.compress_pdf),
+            getString(R.string.export_images),
+            getString(R.string.reverse_order),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.more_tools)
+            .setItems(opts) { _, which ->
+                when (which) {
+                    0 -> askCompressLevel()
+                    1 -> {
+                        pendingTreeMode = TreeMode.EXPORT_IMAGES
+                        pickOutputFolder()
+                    }
+                    2 -> {
+                        pages.reverse()
+                        selected.clear()
+                        updateHeader()
+                        (grid.adapter as BaseAdapter).notifyDataSetChanged()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun askCompressLevel() {
+        val levels = arrayOf(
+            getString(R.string.compress_high),
+            getString(R.string.compress_medium),
+            getString(R.string.compress_low),
+        )
+        val presets = arrayOf(900 to 50, 1200 to 68, 1600 to 82)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.compress_pdf)
+            .setItems(levels) { _, which ->
+                pendingCompress = presets[which]
+                pendingExportPages = null
+                val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("application/pdf")
+                    .putExtra(Intent.EXTRA_TITLE, "${baseName()}-compressed.pdf")
+                try { startActivityForResult(i, REQ_SAVE) } catch (_: Exception) {
+                    Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun pickOutputFolder() {
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        try { startActivityForResult(i, REQ_TREE) } catch (_: Exception) {
+            Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun startSave(specs: List<PdfTools.PageSpec>, suggestedName: String) {
         if (specs.isEmpty()) return
         pendingExportPages = specs
+        pendingCompress = null
         val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
             .setType("application/pdf")
@@ -242,33 +409,84 @@ class OrganizePagesActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQ_SAVE || resultCode != RESULT_OK) return
-        val outUri = data?.data ?: return
+        if (resultCode != RESULT_OK || data == null) return
         val d = doc ?: return
-        val specs = pendingExportPages ?: return
-        progress.visibility = View.VISIBLE
-        Toast.makeText(this, R.string.saving_pdf, Toast.LENGTH_SHORT).show()
-        io.execute {
-            val ok = try {
-                contentResolver.openOutputStream(outUri)?.use { os ->
-                    PdfTools.exportOrganized(d, specs, os)
-                } ?: error("Cannot write")
-                true
-            } catch (_: Throwable) { false }
-            runOnUiThread {
-                if (isFinishing) return@runOnUiThread
-                progress.visibility = View.GONE
-                if (ok) {
-                    AlertDialog.Builder(this)
-                        .setMessage(R.string.saved_pdf)
-                        .setPositiveButton(R.string.open) { _, _ ->
-                            startActivity(Intent(this, ReaderActivity::class.java).setData(outUri))
-                            finish()
+
+        if (requestCode == REQ_SAVE) {
+            val outUri = data.data ?: return
+            val comp = pendingCompress
+            val specs = pendingExportPages
+            progress.visibility = View.VISIBLE
+            Toast.makeText(this, R.string.saving_pdf, Toast.LENGTH_SHORT).show()
+            io.execute {
+                val ok = try {
+                    contentResolver.openOutputStream(outUri)?.use { os ->
+                        if (comp != null) PdfTools.compressPdf(d, comp.first, comp.second, os)
+                        else if (specs != null) PdfTools.exportOrganized(d, specs, os)
+                    } ?: error("Cannot write")
+                    true
+                } catch (_: Throwable) { false }
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    progress.visibility = View.GONE
+                    if (ok) {
+                        AlertDialog.Builder(this)
+                            .setMessage(R.string.saved_pdf)
+                            .setPositiveButton(R.string.open) { _, _ ->
+                                startActivity(Intent(this, ReaderActivity::class.java).setData(outUri))
+                                finish()
+                            }
+                            .setNegativeButton(android.R.string.ok, null)
+                            .show()
+                    } else {
+                        Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        } else if (requestCode == REQ_TREE) {
+            val treeUri = data.data ?: return
+            val docTreeUri = DocumentsContract.buildDocumentUriUsingTree(
+                treeUri,
+                DocumentsContract.getTreeDocumentId(treeUri),
+            )
+            val snapshot = pages.toList()
+            val selSnapshot = selected.sorted().mapNotNull { snapshot.getOrNull(it) }.ifEmpty { snapshot }
+            val mode = pendingTreeMode
+            val chunk = pendingSplitChunk.coerceAtLeast(1)
+            progress.visibility = View.VISIBLE
+            Toast.makeText(this, R.string.saving_pdf, Toast.LENGTH_SHORT).show()
+            io.execute {
+                var count = 0
+                val ok = try {
+                    if (mode == TreeMode.SPLIT_WHOLE) {
+                        val chunks = snapshot.chunked(chunk)
+                        for ((idx, part) in chunks.withIndex()) {
+                            val fileName = "${baseName()}_part_${idx + 1}.pdf"
+                            val created = DocumentsContract.createDocument(contentResolver, docTreeUri, "application/pdf", fileName)
+                                ?: continue
+                            contentResolver.openOutputStream(created)?.use { os ->
+                                PdfTools.exportOrganized(d, part, os)
+                            }
+                            count++
                         }
-                        .setNegativeButton(android.R.string.ok, null)
-                        .show()
-                } else {
-                    Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+                    } else {
+                        for ((idx, spec) in selSnapshot.withIndex()) {
+                            val fileName = "${baseName()}_page_${spec.pageIndex + 1}.jpg"
+                            val created = DocumentsContract.createDocument(contentResolver, docTreeUri, "image/jpeg", fileName)
+                                ?: continue
+                            contentResolver.openOutputStream(created)?.use { os ->
+                                PdfTools.exportPageAsJpeg(d, spec.pageIndex, spec.rotationDeg, os)
+                            }
+                            count = idx + 1
+                        }
+                    }
+                    count > 0
+                } catch (_: Throwable) { false }
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    progress.visibility = View.GONE
+                    val msg = if (ok) getString(R.string.exported_count, count) else getString(R.string.cannot_open)
+                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -287,7 +505,7 @@ class OrganizePagesActivity : Activity() {
                 addView(ImageView(context).apply {
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     setBackgroundColor(Color.WHITE)
-                }, LinearLayout.LayoutParams(-1, dp(130)))
+                }, LinearLayout.LayoutParams(-1, dp(126)))
                 addView(TextView(context).apply {
                     textSize = 12f
                     gravity = Gravity.CENTER
@@ -295,12 +513,13 @@ class OrganizePagesActivity : Activity() {
                 })
             }
             val spec = pages[position]
-            val selected = position == selectedPos
-            cell.background = Ui.rounded(pal.card, dp(12).toFloat(), if (selected) dp(2) else dp(1), if (selected) pal.gold else pal.divider)
+            val isSel = selected.contains(position)
+            cell.background = Ui.rounded(pal.card, dp(12).toFloat(), if (isSel) dp(2) else dp(1), if (isSel) pal.gold else pal.divider)
             val img = cell.getChildAt(0) as ImageView
             val lbl = cell.getChildAt(1) as TextView
-            lbl.setTextColor(if (selected) pal.gold else pal.text)
-            lbl.text = if (spec.rotationDeg == 0) "${spec.pageIndex + 1}" else "${spec.pageIndex + 1} · ${spec.rotationDeg}°"
+            lbl.setTextColor(if (isSel) pal.gold else pal.text)
+            val prefix = if (isSel) "✓ " else ""
+            lbl.text = prefix + if (spec.rotationDeg == 0) "${spec.pageIndex + 1}" else "${spec.pageIndex + 1} · ${spec.rotationDeg}°"
 
             img.tag = position
             val baseBmp = thumbs.get(spec.pageIndex)
@@ -333,5 +552,6 @@ class OrganizePagesActivity : Activity() {
         const val EXTRA_NAME = "name"
         const val EXTRA_PASSWORD = "password"
         private const val REQ_SAVE = 51
+        private const val REQ_TREE = 52
     }
 }

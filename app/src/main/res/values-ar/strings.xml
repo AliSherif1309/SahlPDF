@@ -122,4 +122,20 @@
     <string name="merge_short">دمج</string>
     <string name="search_files_hint">ابحث في الملفات…</string>
     <string name="search_files_empty">لا توجد ملفات مطابقة.</string>
+    <string name="select_all">تحديد الكل</string>
+    <string name="deselect_all">إلغاء تحديد الكل</string>
+    <string name="more_tools">أدوات</string>
+    <string name="split_whole_pdf">تقسيم PDF بالكامل (صفحة لكل ملف)</string>
+    <string name="split_every_n">تقسيم كل N صفحة…</string>
+    <string name="split_every_n_hint">عدد الصفحات في كل ملف (مثلاً 2)</string>
+    <string name="extract_range">استخراج نطاق صفحات…</string>
+    <string name="extract_selected">استخراج الصفحات المحددة</string>
+    <string name="select_pages_first">حدد صفحة واحدة على الأقل</string>
+    <string name="compress_pdf">ضغط ملف PDF</string>
+    <string name="compress_high">ضغط عالٍ (أصغر حجم)</string>
+    <string name="compress_medium">ضغط متوسط (متوازن)</string>
+    <string name="compress_low">ضغط خفيف (أعلى جودة)</string>
+    <string name="export_images">تصدير الصفحات كصور</string>
+    <string name="reverse_order">عكس ترتيب الصفحات</string>
+    <string name="exported_count">تم حفظ %1$d ملفات</string>
 </resources>

@@ -122,4 +122,20 @@
     <string name="merge_short">Merge</string>
     <string name="search_files_hint">Search files…</string>
     <string name="search_files_empty">No matching PDFs found.</string>
+    <string name="select_all">Select all</string>
+    <string name="deselect_all">Deselect all</string>
+    <string name="more_tools">Tools</string>
+    <string name="split_whole_pdf">Split whole PDF (1 page each)</string>
+    <string name="split_every_n">Split every N pages…</string>
+    <string name="split_every_n_hint">Pages per file (e.g. 2)</string>
+    <string name="extract_range">Extract page range…</string>
+    <string name="extract_selected">Extract selected pages</string>
+    <string name="select_pages_first">Select at least one page</string>
+    <string name="compress_pdf">Compress PDF</string>
+    <string name="compress_high">High compression (smallest)</string>
+    <string name="compress_medium">Medium compression (balanced)</string>
+    <string name="compress_low">Light compression (best quality)</string>
+    <string name="export_images">Export pages as images</string>
+    <string name="reverse_order">Reverse page order</string>
+    <string name="exported_count">Saved %1$d files</string>
 </resources>
