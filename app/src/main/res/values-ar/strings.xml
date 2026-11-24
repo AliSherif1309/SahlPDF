@@ -76,4 +76,15 @@
     <string name="no_notes">لا توجد تظليلات أو ملاحظات بعد.</string>
     <string name="delete">حذف</string>
     <string name="open_link">فتح الرابط؟</string>
+    <string name="underline">تسطير</string>
+    <string name="strikeout">شطب</string>
+    <string name="squiggly">متموّج</string>
+    <string name="annotate">تدوين</string>
+    <string name="pen">قلم</string>
+    <string name="marker">تظليل</string>
+    <string name="eraser">ممحاة</string>
+    <string name="sticky_note">ملاحظة لاصقة</string>
+    <string name="tap_to_place_note">انقر في أي مكان بالصفحة لوضع ملاحظة</string>
+    <string name="undo">تراجع</string>
+    <string name="done">تم</string>
 </resources>

@@ -76,4 +76,15 @@
     <string name="no_notes">No highlights or notes yet.</string>
     <string name="delete">Delete</string>
     <string name="open_link">Open link?</string>
+    <string name="underline">Underline</string>
+    <string name="strikeout">Strike</string>
+    <string name="squiggly">Squiggly</string>
+    <string name="annotate">Annotate</string>
+    <string name="pen">Pen</string>
+    <string name="marker">Marker</string>
+    <string name="eraser">Eraser</string>
+    <string name="sticky_note">Sticky note</string>
+    <string name="tap_to_place_note">Tap anywhere on a page to place a note</string>
+    <string name="undo">Undo</string>
+    <string name="done">Done</string>
 </resources>

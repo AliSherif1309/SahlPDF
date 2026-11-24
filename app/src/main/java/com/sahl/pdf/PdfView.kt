@@ -31,12 +31,17 @@ import kotlin.math.roundToInt
 @SuppressLint("ViewConstructor")
 class PdfView(context: Context, private val renderer: Renderer) : View(context) {
 
+    enum class ToolMode { NONE, PEN, MARKER, ERASER, STICKY }
+
     interface Listener {
         fun onPageChanged(page: Int, count: Int)
         fun onTap()
         fun onLinkTap(link: PageLink)
         fun onSelectionChanged(selection: TextSelection?)
         fun onAnnotationTap(entry: Library.AnnotationEntry)
+        fun onInkAdded(page: Int, color: Int, width: Float, points: List<Float>)
+        fun onInkErased(id: String)
+        fun onStickyTap(page: Int, nx: Float, ny: Float)
     }
 
     var listener: Listener? = null
@@ -89,7 +94,13 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private var searchHits: List<SearchHit> = emptyList()
     private var activeHitIndex = -1
     private var annotations: List<Library.AnnotationEntry> = emptyList()
+    private var inks: List<Library.InkStroke> = emptyList()
     var selection: TextSelection? = null; private set
+    var toolMode = ToolMode.NONE
+    var penColor: Int = 0xFF0E6B4E.toInt()
+    var penWidth: Float = 0.004f
+    private var activeInkPage = -1
+    private val activeInkPts = ArrayList<Float>()
     private val linksCache = HashMap<Int, List<PageLink>>()
     private val linksPending = HashSet<Int>()
 
@@ -109,6 +120,11 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private val hitPaint = Paint().apply { color = 0x55F5C84C }
     private val activeHitPaint = Paint().apply { color = 0x99F5C84C.toInt() }
     private val annPaint = Paint()
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+    private val inkPath = android.graphics.Path()
     private val noteDotPaint = Paint().apply { color = 0xFFF5C84C.toInt() }
     private val selPaint = Paint().apply { color = 0x66F5C84C }
     private val handleFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF0E6B4E.toInt() }
@@ -156,6 +172,11 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
 
     fun setAnnotations(list: List<Library.AnnotationEntry>) {
         annotations = list
+        invalidate()
+    }
+
+    fun setInks(list: List<Library.InkStroke>) {
+        inks = list
         invalidate()
     }
 
@@ -341,7 +362,15 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         requestRenders(visiblePages)
     }
 
-    private fun drawNormRects(canvas: Canvas, pageIdx: Int, pageDst: RectF, rects: List<NormRect>, paint: Paint, dot: Boolean = false) {
+    private fun drawNormRects(
+        canvas: Canvas,
+        pageIdx: Int,
+        pageDst: RectF,
+        rects: List<NormRect>,
+        paint: Paint,
+        dot: Boolean = false,
+        style: String = "highlight",
+    ) {
         val crop = cropFor(pageIdx)
         val cw = max(0.05f, crop.width)
         val ch = max(0.05f, crop.height)
@@ -356,17 +385,83 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             val t = pageDst.top + rt * pageDst.height()
             val r = pageDst.left + rr * pageDst.width()
             val b = pageDst.top + rb * pageDst.height()
-            canvas.drawRect(l, t, r, b, paint)
-            if (dot && idx == 0) canvas.drawCircle(r, t, 4 * dp, noteDotPaint)
+            when (style) {
+                "underline" -> {
+                    linePaint.color = paint.color or 0xFF000000.toInt()
+                    linePaint.strokeWidth = 2.2f * dp
+                    canvas.drawLine(l, b, r, b, linePaint)
+                }
+                "strikeout" -> {
+                    linePaint.color = paint.color or 0xFF000000.toInt()
+                    linePaint.strokeWidth = 2.2f * dp
+                    val mid = (t + b) / 2f
+                    canvas.drawLine(l, mid, r, mid, linePaint)
+                }
+                "squiggly" -> {
+                    linePaint.color = paint.color or 0xFF000000.toInt()
+                    linePaint.strokeWidth = 1.8f * dp
+                    inkPath.reset()
+                    inkPath.moveTo(l, b)
+                    val step = 5f * dp
+                    var x = l
+                    var up = true
+                    while (x < r) {
+                        val nx = min(r, x + step)
+                        inkPath.lineTo(nx, if (up) b - 2.5f * dp else b + 1f * dp)
+                        x = nx; up = !up
+                    }
+                    canvas.drawPath(inkPath, linePaint)
+                }
+                "sticky" -> {
+                    val sz = 18f * dp
+                    annPaint.color = paint.color or 0xFF000000.toInt()
+                    canvas.drawRoundRect(l, t, l + sz, t + sz, 4f * dp, 4f * dp, annPaint)
+                    linePaint.color = Color.WHITE; linePaint.strokeWidth = 1.5f * dp
+                    canvas.drawLine(l + 4f * dp, t + 6f * dp, l + sz - 4f * dp, t + 6f * dp, linePaint)
+                    canvas.drawLine(l + 4f * dp, t + 10f * dp, l + sz - 4f * dp, t + 10f * dp, linePaint)
+                    canvas.drawLine(l + 4f * dp, t + 14f * dp, l + sz - 7f * dp, t + 14f * dp, linePaint)
+                }
+                else -> canvas.drawRect(l, t, r, b, paint)
+            }
+            if (dot && idx == 0 && style != "sticky") canvas.drawCircle(r, t, 4 * dp, noteDotPaint)
         }
+    }
+
+    private fun drawInkStroke(canvas: Canvas, pageIdx: Int, pageDst: RectF, color: Int, normW: Float, pts: List<Float>) {
+        if (pts.size < 2) return
+        val crop = cropFor(pageIdx)
+        val cw = max(0.05f, crop.width)
+        val ch = max(0.05f, crop.height)
+        val fullW = pageDst.width() / cw
+        inkPaint.color = color
+        inkPaint.strokeWidth = max(1.5f, normW * fullW)
+        inkPath.reset()
+        for (k in 0 until pts.size - 1 step 2) {
+            val sx = pageDst.left + ((pts[k] - crop.left) / cw) * pageDst.width()
+            val sy = pageDst.top + ((pts[k + 1] - crop.top) / ch) * pageDst.height()
+            if (k == 0) inkPath.moveTo(sx, sy) else inkPath.lineTo(sx, sy)
+        }
+        if (pts.size == 2) canvas.drawPoint(
+            pageDst.left + ((pts[0] - crop.left) / cw) * pageDst.width(),
+            pageDst.top + ((pts[1] - crop.top) / ch) * pageDst.height(),
+            inkPaint,
+        ) else canvas.drawPath(inkPath, inkPaint)
     }
 
     private fun drawHighlights(canvas: Canvas, pageIdx: Int, pageDst: RectF) {
         for (a in annotations) {
             if (a.page == pageIdx) {
                 annPaint.color = a.color
-                drawNormRects(canvas, pageIdx, pageDst, a.rects, annPaint, dot = a.note.isNotBlank())
+                drawNormRects(canvas, pageIdx, pageDst, a.rects, annPaint, dot = a.note.isNotBlank(), style = a.style)
             }
+        }
+        for (s in inks) {
+            if (s.page == pageIdx) drawInkStroke(canvas, pageIdx, pageDst, s.color, s.width, s.points)
+        }
+        if (activeInkPage == pageIdx && activeInkPts.isNotEmpty()) {
+            val c = if (toolMode == ToolMode.MARKER) (penColor and 0x00FFFFFF) or 0x55000000 else penColor
+            val w = if (toolMode == ToolMode.MARKER) penWidth * 3.2f else penWidth
+            drawInkStroke(canvas, pageIdx, pageDst, c, w, activeInkPts)
         }
         for (idx in searchHits.indices) {
             val hit = searchHits[idx]
@@ -599,6 +694,10 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
                     listener?.onAnnotationTap(ann)
                     return true
                 }
+                if (toolMode == ToolMode.STICKY) {
+                    listener?.onStickyTap(p, nx, ny)
+                    return true
+                }
                 val d = doc
                 val cached = linksCache[p]
                 if (cached != null) {
@@ -640,8 +739,66 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         return dx * dx + dy * dy <= r * r
     }
 
+    private fun eraseNear(page: Int, nx: Float, ny: Float) {
+        val hit = inks.firstOrNull { s ->
+            if (s.page != page) return@firstOrNull false
+            for (k in 0 until s.points.size - 1 step 2) {
+                val dx = s.points[k] - nx
+                val dy = s.points[k + 1] - ny
+                if (dx * dx + dy * dy <= 0.03f * 0.03f) return@firstOrNull true
+            }
+            false
+        } ?: return
+        listener?.onInkErased(hit.id)
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (toolMode == ToolMode.PEN || toolMode == ToolMode.MARKER) {
+            if (event.pointerCount == 1) {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        val hit = hitTestPage(event.x, event.y)
+                        if (hit != null) {
+                            stopMotion()
+                            activeInkPage = hit.first
+                            activeInkPts.clear()
+                            activeInkPts += hit.second; activeInkPts += hit.third
+                            invalidate()
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_MOVE -> if (activeInkPage >= 0) {
+                        val hit = hitTestPage(event.x, event.y)
+                        if (hit != null && hit.first == activeInkPage) {
+                            activeInkPts += hit.second; activeInkPts += hit.third
+                            invalidate()
+                        }
+                        return true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (activeInkPage >= 0) {
+                        val p = activeInkPage
+                        val pts = activeInkPts.toList()
+                        activeInkPage = -1
+                        activeInkPts.clear()
+                        val c = if (toolMode == ToolMode.MARKER) (penColor and 0x00FFFFFF) or 0x55000000 else penColor
+                        val w = if (toolMode == ToolMode.MARKER) penWidth * 3.2f else penWidth
+                        listener?.onInkAdded(p, c, w, pts)
+                        invalidate()
+                        return true
+                    }
+                }
+            } else {
+                activeInkPage = -1
+                activeInkPts.clear()
+            }
+        } else if (toolMode == ToolMode.ERASER && event.pointerCount == 1) {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_MOVE) {
+                hitTestPage(event.x, event.y)?.let { (p, nx, ny) -> eraseNear(p, nx, ny) }
+                return true
+            }
+        }
+
         scale.onTouchEvent(event)
         val sel = selection
         if (event.actionMasked == MotionEvent.ACTION_DOWN && sel != null) {
