@@ -43,6 +43,12 @@ class MergeActivity : Activity() {
         SahlCore.catchCrashes(this)
         pal = Palette(this)
         buildUi()
+        val initial = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableArrayListExtra(EXTRA_URIS, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION") intent.getParcelableArrayListExtra(EXTRA_URIS)
+        }
+        if (!initial.isNullOrEmpty()) loadUris(initial)
     }
 
     override fun onDestroy() {
@@ -192,25 +198,7 @@ class MergeActivity : Activity() {
             data.clipData?.let { cd -> for (i in 0 until cd.itemCount) uris += cd.getItemAt(i).uri }
             if (uris.isEmpty()) data.data?.let { uris += it }
             if (uris.isEmpty()) return
-            progress.visibility = View.VISIBLE
-            io.execute {
-                val added = ArrayList<Item>()
-                for (u in uris) {
-                    val d = try { PdfDoc.open(this, u, null) } catch (_: Throwable) { null }
-                    if (d != null) {
-                        val n = queryName(u)
-                        added += Item(u, n, d.pageCount)
-                        d.close()
-                    }
-                }
-                runOnUiThread {
-                    if (isFinishing) return@runOnUiThread
-                    progress.visibility = View.GONE
-                    items += added
-                    if (added.isEmpty()) Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
-                    refresh()
-                }
-            }
+            loadUris(uris)
         } else if (requestCode == REQ_SAVE) {
             val outUri = data.data ?: return
             val snapshot = items.toList()
@@ -283,7 +271,30 @@ class MergeActivity : Activity() {
         }
     }
 
+    private fun loadUris(uris: List<Uri>) {
+        progress.visibility = View.VISIBLE
+        io.execute {
+            val added = ArrayList<Item>()
+            for (u in uris) {
+                val d = try { PdfDoc.open(this, u, null) } catch (_: Throwable) { null }
+                if (d != null) {
+                    val n = queryName(u)
+                    added += Item(u, n, d.pageCount)
+                    d.close()
+                }
+            }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                progress.visibility = View.GONE
+                items += added
+                if (added.isEmpty()) Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+                refresh()
+            }
+        }
+    }
+
     companion object {
+        const val EXTRA_URIS = "uris"
         private const val REQ_PICK = 61
         private const val REQ_SAVE = 62
     }

@@ -117,4 +117,9 @@
     <string name="filter_original">Original</string>
     <string name="filter_enhanced">Enhanced</string>
     <string name="filter_bw">B&amp;W</string>
+    <string name="select_mode">Select</string>
+    <string name="selected_count">%1$d selected</string>
+    <string name="merge_short">Merge</string>
+    <string name="search_files_hint">Search files…</string>
+    <string name="search_files_empty">No matching PDFs found.</string>
 </resources>
