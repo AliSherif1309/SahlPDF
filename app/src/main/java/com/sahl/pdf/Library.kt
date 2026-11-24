@@ -155,6 +155,7 @@ object Library {
         val rects: List<NormRect>,
         val text: String,
         val note: String,
+        val color: Int,
         val added: Long,
     )
 
@@ -176,7 +177,8 @@ object Library {
                 }
                 AnnotationEntry(
                     o.getString("id"), o.getInt("page"), rects,
-                    o.optString("text"), o.optString("note"), o.optLong("added"),
+                    o.optString("text"), o.optString("note"),
+                    o.optInt("color", 0x66F5C84C), o.optLong("added"),
                 )
             }.sortedBy { it.page }
         } catch (_: Exception) { emptyList() }
@@ -194,14 +196,22 @@ object Library {
             }
             arr.put(JSONObject().apply {
                 put("id", a.id); put("page", a.page); put("rects", ra)
-                put("text", a.text); put("note", a.note); put("added", a.added)
+                put("text", a.text); put("note", a.note); put("color", a.color); put("added", a.added)
             })
         }
         notePrefs(c).edit().putString(sha1(docKey), arr.toString()).apply()
     }
 
-    fun addAnnotation(c: Context, docKey: String, page: Int, rects: List<NormRect>, text: String, note: String): AnnotationEntry {
-        val entry = AnnotationEntry(java.util.UUID.randomUUID().toString(), page, rects, text, note, System.currentTimeMillis())
+    fun addAnnotation(
+        c: Context,
+        docKey: String,
+        page: Int,
+        rects: List<NormRect>,
+        text: String,
+        note: String,
+        color: Int = 0x66F5C84C,
+    ): AnnotationEntry {
+        val entry = AnnotationEntry(java.util.UUID.randomUUID().toString(), page, rects, text, note, color, System.currentTimeMillis())
         saveAnnotations(c, docKey, annotations(c, docKey) + entry)
         return entry
     }

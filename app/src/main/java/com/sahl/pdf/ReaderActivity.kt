@@ -248,24 +248,67 @@ class ReaderActivity : Activity(), PdfView.Listener {
             bottomMargin = dp(24)
         })
 
+        val highlightColors = intArrayOf(
+            0x66F5C84C,          // Gold
+            0x552E9E6B,          // Emerald
+            0x553B9DF2,          // Sky blue
+            0x55E85D75,          // Rose
+            0x559B72CF,          // Lavender
+        )
+        var activeColor = highlightColors[0]
+        val colorDots = ArrayList<View>()
+
         selectionBar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = Ui.rounded(Color.parseColor("#EB0B110F"), dp(22).toFloat(), dp(1), Color.parseColor("#33FFFFFF"))
+            setPadding(dp(10), dp(6), dp(10), dp(4))
+            visibility = View.GONE
+        }
+
+        val dotsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(2), 0, dp(4))
+        }
+        fun refreshDots() {
+            for (i in colorDots.indices) {
+                val c = highlightColors[i] or 0xFF000000.toInt()
+                val selected = highlightColors[i] == activeColor
+                colorDots[i].background = Ui.rounded(c, dp(12).toFloat(), if (selected) dp(2) else 0, Color.WHITE)
+            }
+            pdfView.selectionColor = activeColor
+        }
+        for (c in highlightColors) {
+            val dot = View(this).apply {
+                setOnClickListener {
+                    activeColor = c
+                    refreshDots()
+                }
+            }
+            colorDots += dot
+            dotsRow.addView(dot, LinearLayout.LayoutParams(dp(22), dp(22)).apply { setMargins(dp(6), 0, dp(6), 0) })
+        }
+        refreshDots()
+        selectionBar.addView(dotsRow)
+
+        val actionsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = Ui.rounded(Color.parseColor("#EB0B110F"), dp(22).toFloat(), dp(1), Color.parseColor("#33FFFFFF"))
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-            visibility = View.GONE
         }
         fun selBtn(label: Int, click: () -> Unit) = TextView(this).apply {
             text = getString(label)
             setTextColor(Color.WHITE); textSize = 13.5f; typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(12), dp(6), dp(12), dp(6))
             Ui.focusable(this, Color.TRANSPARENT, dp(16).toFloat(), Color.parseColor("#F5C84C"))
             setOnClickListener { click() }
         }
-        selectionBar.addView(selBtn(R.string.copy) { copySelection() })
-        selectionBar.addView(selBtn(R.string.highlight) { saveSelection(withNote = false) })
-        selectionBar.addView(selBtn(R.string.add_note) { saveSelection(withNote = true) })
-        selectionBar.addView(icon(R.drawable.ic_close, android.R.string.cancel) { pdfView.clearSelection() })
+        actionsRow.addView(selBtn(R.string.copy) { copySelection() })
+        actionsRow.addView(selBtn(R.string.highlight) { saveSelection(withNote = false, color = activeColor) })
+        actionsRow.addView(selBtn(R.string.add_note) { saveSelection(withNote = true, color = activeColor) })
+        actionsRow.addView(icon(R.drawable.ic_close, android.R.string.cancel) { pdfView.clearSelection() })
+        selectionBar.addView(actionsRow)
+
         root.addView(selectionBar, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
             bottomMargin = dp(72)
         })
@@ -641,27 +684,129 @@ class ReaderActivity : Activity(), PdfView.Listener {
         pdfView.clearSelection()
     }
 
-    private fun saveSelection(withNote: Boolean) {
+    private fun saveSelection(withNote: Boolean, color: Int = 0x66F5C84C) {
         val sel = pdfView.selection ?: return
         if (!withNote) {
-            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, "")
+            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, "", color)
             pdfView.setAnnotations(Library.annotations(this, key))
             pdfView.clearSelection()
             return
         }
-        val input = EditText(this).apply { hint = getString(R.string.note_hint) }
-        val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.add_note)
-            .setMessage(sel.text.take(140))
-            .setView(box)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, input.text.toString().trim())
-                pdfView.setAnnotations(Library.annotations(this, key))
-                pdfView.clearSelection()
+        showNoteEditor(R.string.add_note, sel.text, "") { note ->
+            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, note, color)
+            pdfView.setAnnotations(Library.annotations(this, key))
+            pdfView.clearSelection()
+        }
+    }
+
+    private fun showNoteEditor(titleRes: Int, quote: String, initialNote: String, onSave: (String) -> Unit) {
+        val pal = Palette(this)
+        val dlg = android.app.Dialog(this)
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Ui.rounded(pal.bg, dp(22).toFloat(), dp(1), pal.divider)
+            setPadding(dp(20), dp(18), dp(20), dp(16))
+        }
+        card.addView(TextView(this).apply {
+            text = getString(titleRes)
+            textSize = 19f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(pal.text)
+            setPadding(0, 0, 0, dp(10))
+        })
+
+        if (quote.isNotBlank()) {
+            val quoteBox = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                background = Ui.rounded(pal.card, dp(14).toFloat())
+                setPadding(dp(12), dp(10), dp(12), dp(10))
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            quoteBox.addView(View(this).apply {
+                setBackgroundColor(pal.gold)
+            }, LinearLayout.LayoutParams(dp(3), -1).apply { marginEnd = dp(10) })
+            quoteBox.addView(TextView(this).apply {
+                text = quote.take(220)
+                textSize = 13f
+                setTextColor(pal.sub)
+                maxLines = 3
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            card.addView(quoteBox, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        }
+
+        val input = EditText(this).apply {
+            setText(initialNote)
+            hint = getString(R.string.note_hint)
+            setTextColor(pal.text)
+            setHintTextColor(pal.sub)
+            textSize = 15f
+            gravity = Gravity.TOP or Gravity.START
+            minLines = 5
+            maxLines = 10
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            isSingleLine = false
+            background = Ui.rounded(pal.card, dp(16).toFloat(), dp(1), pal.divider)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+        }
+
+        val fmtBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(8))
+        }
+        fun fmtBtn(label: String, bold: Boolean = false, italic: Boolean = false, click: () -> Unit) = TextView(this).apply {
+            text = label
+            textSize = 14f
+            setTextColor(pal.text)
+            typeface = when {
+                bold -> Typeface.DEFAULT_BOLD
+                italic -> Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+                else -> Typeface.DEFAULT
+            }
+            gravity = Gravity.CENTER
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            Ui.focusable(this, pal.card, dp(12).toFloat(), pal.gold)
+            setOnClickListener { click() }
+        }
+        fmtBar.addView(fmtBtn("B", bold = true) { NoteFormat.wrap(input, "**", "**") },
+            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        fmtBar.addView(fmtBtn("I", italic = true) { NoteFormat.wrap(input, "*", "*") },
+            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        fmtBar.addView(fmtBtn("•") { NoteFormat.toggleLinePrefix(input, "- ") },
+            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        fmtBar.addView(fmtBtn("☑") { NoteFormat.toggleLinePrefix(input, "- [ ] ") })
+        card.addView(fmtBar)
+        card.addView(input, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+        }
+        btnRow.addView(TextView(this).apply {
+            text = getString(android.R.string.cancel)
+            setTextColor(pal.sub); textSize = 14.5f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            setOnClickListener { dlg.dismiss() }
+        })
+        btnRow.addView(TextView(this).apply {
+            text = getString(android.R.string.ok)
+            setTextColor(Color.WHITE); textSize = 14.5f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(20), dp(10), dp(20), dp(10))
+            Ui.focusable(this, pal.accent, dp(14).toFloat(), pal.gold)
+            setOnClickListener {
+                onSave(input.text.toString().trim())
+                dlg.dismiss()
+            }
+        }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        card.addView(btnRow)
+
+        dlg.setContentView(card)
+        dlg.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dlg.window?.setLayout((resources.displayMetrics.widthPixels * 0.92f).toInt(), -2)
+        dlg.show()
+        input.requestFocus()
     }
 
     private fun showAnnotations() {
@@ -747,29 +892,55 @@ class ReaderActivity : Activity(), PdfView.Listener {
     }
 
     override fun onAnnotationTap(entry: Library.AnnotationEntry) {
-        val msg = if (entry.note.isNotBlank()) "${entry.text}\n\n📝 ${entry.note}" else entry.text
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.page_of, entry.page + 1, pdfView.pageCount))
-            .setMessage(msg)
-            .setPositiveButton(R.string.edit_note) { _, _ ->
-                val input = EditText(this).apply { setText(entry.note); hint = getString(R.string.note_hint) }
-                val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
-                AlertDialog.Builder(this)
-                    .setTitle(R.string.edit_note)
-                    .setView(box)
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        Library.updateAnnotationNote(this, key, entry.id, input.text.toString().trim())
-                        pdfView.setAnnotations(Library.annotations(this, key))
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
-            }
-            .setNeutralButton(R.string.copy) { _, _ -> copyText(entry.text) }
-            .setNegativeButton(R.string.delete) { _, _ ->
-                Library.removeAnnotation(this, key, entry.id)
+        val pal = Palette(this)
+        val dlg = android.app.Dialog(this)
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Ui.rounded(pal.bg, dp(22).toFloat(), dp(1), pal.divider)
+            setPadding(dp(20), dp(18), dp(20), dp(14))
+        }
+        card.addView(TextView(this).apply {
+            text = getString(R.string.page_of, entry.page + 1, pdfView.pageCount)
+            textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(pal.text)
+            setPadding(0, 0, 0, dp(10))
+        })
+        card.addView(TextView(this).apply {
+            text = entry.text
+            textSize = 13.5f; setTextColor(pal.sub)
+            background = Ui.rounded(pal.card, dp(14).toFloat())
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        if (entry.note.isNotBlank()) {
+            card.addView(TextView(this).apply {
+                text = NoteFormat.render(entry.note)
+                textSize = 15f; setTextColor(pal.text)
+                setPadding(dp(4), dp(2), dp(4), dp(12))
+            })
+        }
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
+        fun btn(label: Int, color: Int, click: () -> Unit) = TextView(this).apply {
+            text = getString(label); setTextColor(color); textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(8), dp(12), dp(8)); setOnClickListener { click() }
+        }
+        row.addView(btn(R.string.delete, Color.parseColor("#E05A47")) {
+            Library.removeAnnotation(this, key, entry.id)
+            pdfView.setAnnotations(Library.annotations(this, key))
+            dlg.dismiss()
+        })
+        row.addView(btn(R.string.copy, pal.sub) { copyText(entry.text); dlg.dismiss() })
+        row.addView(btn(R.string.edit_note, pal.accent) {
+            dlg.dismiss()
+            showNoteEditor(R.string.edit_note, entry.text, entry.note) { updated ->
+                Library.updateAnnotationNote(this, key, entry.id, updated)
                 pdfView.setAnnotations(Library.annotations(this, key))
             }
-            .show()
+        })
+        card.addView(row)
+        dlg.setContentView(card)
+        dlg.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dlg.window?.setLayout((resources.displayMetrics.widthPixels * 0.92f).toInt(), -2)
+        dlg.show()
     }
 
     // ---- keys (TV remote, keyboards) -----------------------------------------------------

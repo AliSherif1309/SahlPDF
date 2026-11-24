@@ -162,6 +162,27 @@ class PdfDoc private constructor(
         }
     }.getOrNull()
 
+    fun selectBetween(
+        pageIdx: Int,
+        startChar: Int,
+        endChar: Int,
+        nx: Float,
+        ny: Float,
+        moveStart: Boolean,
+    ): TextSelection? = runCatching {
+        val p = page(pageIdx)
+        val pt = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (nx * 10000f).toInt(), (ny * 10000f).toInt())
+        p.openTextPage().use { tp ->
+            val total = tp.textPageCountChars()
+            if (total <= 0) return null
+            val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 28.0, 28.0)
+            if (idx !in 0 until total) return null
+            val s = (if (moveStart) idx else startChar).coerceIn(0, total - 1)
+            val e = (if (moveStart) endChar else idx).coerceIn(0, total - 1)
+            buildSelection(p, tp, pageIdx, minOf(s, e), maxOf(s, e))
+        }
+    }.getOrNull()
+
     private fun buildSelection(
         p: PdfPage,
         tp: io.legere.pdfiumandroid.PdfTextPage,
@@ -183,7 +204,8 @@ class PdfDoc private constructor(
             val bottom = maxOf(dr.top, dr.bottom) / 10000f
             if (right > left && bottom > top) rects += NormRect(left, top, right, bottom)
         }
-        return if (rects.isEmpty()) null else TextSelection(pageIdx, start, end, text, rects)
+        val merged = NoteFormat.mergeLineRects(rects)
+        return if (merged.isEmpty()) null else TextSelection(pageIdx, start, end, text, merged)
     }
 
     fun toc(): List<TocItem> {
