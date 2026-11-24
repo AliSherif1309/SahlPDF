@@ -83,10 +83,19 @@ class ReaderActivity : Activity(), PdfView.Listener {
     }
 
     private fun applyPrefs() {
+        if (Ui.isTv(this) && !prefs.getBoolean(SettingsActivity.TV_DEFAULTS_DONE, false)) {
+            prefs.edit()
+                .putInt(SettingsActivity.FLOW_MODE, FlowMode.HORIZONTAL_LTR.ordinal)
+                .putInt(SettingsActivity.FIT_MODE, FitMode.PAGE.ordinal)
+                .putBoolean(SettingsActivity.TWO_PAGE, true)
+                .putBoolean(SettingsActivity.TV_DEFAULTS_DONE, true)
+                .apply()
+        }
         val flows = FlowMode.entries
         pdfView.flowMode = flows[prefs.getInt(SettingsActivity.FLOW_MODE, 0).coerceIn(0, flows.lastIndex)]
         val fits = FitMode.entries
         pdfView.fitMode = fits[prefs.getInt(SettingsActivity.FIT_MODE, 0).coerceIn(0, fits.lastIndex)]
+        pdfView.twoPage = prefs.getBoolean(SettingsActivity.TWO_PAGE, false)
         pdfView.cropMargins = prefs.getBoolean(SettingsActivity.CROP_MARGINS, false)
         val night = prefs.getBoolean(SettingsActivity.NIGHT, false)
         pdfView.night = night
@@ -508,12 +517,26 @@ class ReaderActivity : Activity(), PdfView.Listener {
             }.show()
     }
 
+    private fun toggleTwoPage() {
+        val next = !pdfView.twoPage
+        if (next && pdfView.flowMode == FlowMode.VERTICAL) {
+            prefs.edit().putInt(SettingsActivity.FLOW_MODE, FlowMode.HORIZONTAL_LTR.ordinal).apply()
+            pdfView.flowMode = FlowMode.HORIZONTAL_LTR
+        }
+        prefs.edit().putBoolean(SettingsActivity.TWO_PAGE, next).apply()
+        pdfView.twoPage = next
+    }
+
     private fun showMenu(anchor: View) {
         val m = PopupMenu(this, anchor)
         m.menu.add(0, 1, 0, R.string.go_to_page)
         m.menu.add(0, 2, 0, R.string.bookmarks)
         m.menu.add(0, 3, 0, R.string.reading_mode)
         m.menu.add(0, 4, 0, R.string.fit_mode)
+        m.menu.add(0, 10, 0, R.string.two_page).apply {
+            isCheckable = true
+            isChecked = pdfView.twoPage
+        }
         m.menu.add(0, 5, 0, R.string.crop_margins).apply {
             isCheckable = true
             isChecked = pdfView.cropMargins
@@ -541,10 +564,36 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 8 -> startSafely(Intent.createChooser(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf")
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.open_with)))
                 9 -> startActivity(Intent(this, SettingsActivity::class.java))
+                10 -> toggleTwoPage()
             }
             true
         }
         m.show()
+    }
+
+    private fun showTvMenu() {
+        val items = listOf(
+            R.string.contents to { showContents() },
+            R.string.go_to_page to { askPage() },
+            R.string.bookmarks to { showBookmarks() },
+            R.string.search to { openSearch() },
+            R.string.one_or_two_pages to { toggleTwoPage() },
+            R.string.reading_mode to { chooseFlowMode() },
+            R.string.fit_mode to { chooseFitMode() },
+            R.string.crop_margins to {
+                val next = !pdfView.cropMargins
+                prefs.edit().putBoolean(SettingsActivity.CROP_MARGINS, next).apply()
+                pdfView.cropMargins = next
+            },
+            R.string.night_pages to { toggleNight() },
+            R.string.toolbars to { setBars(!barsShown) },
+            R.string.settings_title to { startActivity(Intent(this, SettingsActivity::class.java)) },
+        )
+        val labels = items.map { getString(it.first) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.tv_menu)
+            .setItems(labels) { _, which -> items[which].second() }
+            .show()
     }
 
     private fun startSafely(i: Intent) {
@@ -598,16 +647,22 @@ class ReaderActivity : Activity(), PdfView.Listener {
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_DOWN -> if (!barsShown) { pdfView.scrollByAnimated(step); return true }
             KeyEvent.KEYCODE_DPAD_UP -> if (!barsShown) { pdfView.scrollByAnimated(-step); return true }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> if (!barsShown) { pdfView.goTo(pdfView.page + if (rtl) -1 else 1); return true }
-            KeyEvent.KEYCODE_DPAD_LEFT -> if (!barsShown) { pdfView.goTo(pdfView.page + if (rtl) 1 else -1); return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (!barsShown) { pdfView.goTo(pdfView.stepPage(dir = if (rtl) -1 else 1)); return true }
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (!barsShown) { pdfView.goTo(pdfView.stepPage(dir = if (rtl) 1 else -1)); return true }
             KeyEvent.KEYCODE_PAGE_DOWN, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_CHANNEL_DOWN -> {
-                pdfView.goTo(pdfView.page + 1); return true
+                pdfView.goTo(pdfView.stepPage(dir = 1)); return true
             }
             KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_CHANNEL_UP -> {
-                pdfView.goTo(pdfView.page - 1); return true
+                pdfView.goTo(pdfView.stepPage(dir = -1)); return true
             }
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> if (!barsShown) { setBars(true); topBar.getChildAt(0).requestFocus(); return true }
-            KeyEvent.KEYCODE_MENU -> { setBars(!barsShown); return true }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> if (!barsShown) {
+                if (Ui.isTv(this)) showTvMenu() else { setBars(true); topBar.getChildAt(0).requestFocus() }
+                return true
+            }
+            KeyEvent.KEYCODE_MENU -> {
+                if (Ui.isTv(this)) showTvMenu() else setBars(!barsShown)
+                return true
+            }
         }
         return super.onKeyDown(keyCode, event)
     }

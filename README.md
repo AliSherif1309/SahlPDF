@@ -4,24 +4,24 @@ A calm, fast PDF reader for Android phones and TVs, part of the Sahl apps family
 
 Sahl PDF 2 is a new app, written from scratch. It shares no code with earlier versions (those were built on MJ PDF; that code is kept only on the `legacy-mjpdf` tag). It's built step by step: each stage ships as a normal update.
 
-## Features (stage 2: reading comfort)
+## Features (stage 3: TV edition)
 - **Open** from the file picker, from "Open with…" or "Share" in any app, or from the **On this device** list (needs file access, which you're asked for only there).
+- **Send from phone**: open the local address and 6-digit code in any phone browser on the same Wi-Fi to send PDFs straight to `Download/Sahl PDF`.
 - **Recent** list with page thumbnails and reading progress. Each book reopens on the page where you stopped.
-- **Smooth reading**: continuous vertical scroll or horizontal page-by-page (left-to-right and right-to-left for Arabic books), fit width or fit whole page, fling, pinch and double-tap zoom, sharp text when zoomed in.
+- **Smooth reading**: continuous vertical scroll or horizontal page-by-page (left-to-right and right-to-left for Arabic books), **two-page spread**, fit width or fit whole page, fling, pinch and double-tap zoom, sharp text when zoomed in.
 - **Search** inside the document with match highlights and next/previous navigation.
 - **Bookmarks**: bookmark pages and jump back to them anytime.
 - **Crop margins**: automatically trim white page margins for comfortable reading.
 - **Contents** (the PDF's table of contents), **go to page**, a page slider and a page counter.
 - **Night pages** (inverted colours), keep the screen on, password-protected PDFs.
 - **Share / Open with** and document info.
-- **TV remote**: ▲ ▼ scroll, ◀ ▶ previous/next page (respects RTL), ⏪ ⏩ and channel +/− turn pages, OK or Menu shows the toolbars.
+- **TV edition**: first-start TV defaults (two-page spread, whole page visible), **TV menu** on OK/Menu, ▲ ▼ scroll, ◀ ▶ previous/next spread (respects RTL), ⏪ ⏩ and channel +/− turn pages.
 - **In-app updates** from GitHub Releases, and the Sahl Union app strip in Settings.
 - Arabic and English, light and dark.
 
 ## Coming next
 | Stage | Contents |
 |---|---|
-| 3. TV edition | Two-page spread, TV defaults, "Send from phone" over Wi-Fi |
 | 4. Text & notes | Text selection, links, highlights and notes |
 | 5. PDF tools | Organize pages, merge/split, document scanner |
 

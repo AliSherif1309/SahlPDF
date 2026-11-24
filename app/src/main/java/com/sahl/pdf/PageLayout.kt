@@ -24,39 +24,50 @@ class PageLayout(private val pages: List<PageSize>, private val gap: Float) {
     var totalHeight = 0f; private set
     var flow = FlowMode.VERTICAL; private set
     var fit = FitMode.WIDTH; private set
+    var twoPage = false; private set
 
     private var lefts = FloatArray(0)
     private var tops = FloatArray(0)
     private var widths = FloatArray(0)
     private var heights = FloatArray(0)
+    private var spreadSnaps = FloatArray(0)
 
-    fun layout(viewW: Float, viewH: Float, flowMode: FlowMode = FlowMode.VERTICAL, fitMode: FitMode = FitMode.WIDTH) {
+    fun layout(
+        viewW: Float,
+        viewH: Float,
+        flowMode: FlowMode = FlowMode.VERTICAL,
+        fitMode: FitMode = FitMode.WIDTH,
+        spread: Boolean = false,
+    ) {
         width = viewW
         height = viewH
         flow = flowMode
         fit = fitMode
+        twoPage = spread && flowMode != FlowMode.VERTICAL
         val n = pages.size
         lefts = FloatArray(n)
         tops = FloatArray(n)
         widths = FloatArray(n)
         heights = FloatArray(n)
+        spreadSnaps = FloatArray(n)
         if (n == 0 || viewW <= 0f || viewH <= 0f) {
             totalWidth = viewW
             totalHeight = viewH
             return
         }
 
+        val maxPageW = if (twoPage) (viewW - gap) / 2f else viewW
         for (i in 0 until n) {
             val p = pages[i]
             val ratio = if (p.width > 0f && p.height > 0f) p.height / p.width else 1.414f
-            if (fitMode == FitMode.PAGE) {
+            if (fitMode == FitMode.PAGE || twoPage) {
                 val wByH = viewH / ratio
-                if (wByH <= viewW) {
+                if (wByH <= maxPageW) {
                     widths[i] = wByH
                     heights[i] = viewH
                 } else {
-                    widths[i] = viewW
-                    heights[i] = viewW * ratio
+                    widths[i] = maxPageW
+                    heights[i] = maxPageW * ratio
                 }
             } else {
                 widths[i] = viewW
@@ -73,7 +84,7 @@ class PageLayout(private val pages: List<PageSize>, private val gap: Float) {
             }
             totalWidth = viewW
             totalHeight = y
-        } else {
+        } else if (!twoPage) {
             val order = if (flowMode == FlowMode.HORIZONTAL_RTL) (n - 1 downTo 0) else (0 until n)
             var x = gap
             var maxH = viewH
@@ -81,8 +92,37 @@ class PageLayout(private val pages: List<PageSize>, private val gap: Float) {
                 val slotW = maxOf(viewW, widths[i])
                 lefts[i] = x + (slotW - widths[i]) / 2f
                 tops[i] = maxOf(0f, (viewH - heights[i]) / 2f)
+                spreadSnaps[i] = x
                 x += slotW + gap
                 if (heights[i] > maxH) maxH = heights[i]
+            }
+            totalWidth = x
+            totalHeight = maxH
+        } else {
+            // Book spreads: page 0 alone (cover), then (1,2), (3,4)...
+            val spreads = ArrayList<List<Int>>()
+            spreads += listOf(0)
+            var idx = 1
+            while (idx < n) {
+                spreads += if (idx + 1 < n) listOf(idx, idx + 1) else listOf(idx)
+                idx += 2
+            }
+            val orderedSpreads = if (flowMode == FlowMode.HORIZONTAL_RTL) spreads.reversed() else spreads
+            var x = gap
+            var maxH = viewH
+            for (sp in orderedSpreads) {
+                val visual = if (flowMode == FlowMode.HORIZONTAL_RTL && sp.size == 2) listOf(sp[1], sp[0]) else sp
+                val contentW = visual.sumOf { widths[it].toDouble() }.toFloat() + if (visual.size == 2) gap else 0f
+                val slotW = maxOf(viewW, contentW)
+                var px = x + (slotW - contentW) / 2f
+                for (p in visual) {
+                    lefts[p] = px
+                    tops[p] = maxOf(0f, (viewH - heights[p]) / 2f)
+                    spreadSnaps[p] = x
+                    px += widths[p] + gap
+                    if (heights[p] > maxH) maxH = heights[p]
+                }
+                x += slotW + gap
             }
             totalWidth = x
             totalHeight = maxH
@@ -90,7 +130,7 @@ class PageLayout(private val pages: List<PageSize>, private val gap: Float) {
     }
 
     /** Backwards-compatible helper for vertical fit-width layout. */
-    fun layout(viewW: Float) = layout(viewW, viewW * 2f, FlowMode.VERTICAL, FitMode.WIDTH)
+    fun layout(viewW: Float) = layout(viewW, viewW * 2f, FlowMode.VERTICAL, FitMode.WIDTH, false)
 
     fun left(i: Int) = lefts[i]
     fun top(i: Int) = tops[i]
@@ -100,7 +140,7 @@ class PageLayout(private val pages: List<PageSize>, private val gap: Float) {
     fun bottom(i: Int) = tops[i] + heights[i]
 
     /** Snap x-offset for page [i] in horizontal mode (centered in viewport). */
-    fun snapX(i: Int): Float = (lefts[i] - (width - widths[i]) / 2f).coerceAtLeast(0f)
+    fun snapX(i: Int): Float = if (i in spreadSnaps.indices) spreadSnaps[i] else 0f
 
     /** Index of the page nearest to base coordinates ([x], [y]). */
     fun pageAt(x: Float, y: Float): Int {
