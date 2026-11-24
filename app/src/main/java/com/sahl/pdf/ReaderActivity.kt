@@ -628,56 +628,77 @@ class ReaderActivity : Activity(), PdfView.Listener {
         pdfView.twoPage = next
     }
 
-    private fun showMenu(anchor: View) {
-        val m = PopupMenu(this, anchor)
-        m.menu.add(0, 1, 0, R.string.go_to_page)
-        m.menu.add(0, 2, 0, R.string.bookmarks)
-        m.menu.add(0, 11, 0, R.string.notes_title)
-        m.menu.add(0, 3, 0, R.string.reading_mode)
-        m.menu.add(0, 4, 0, R.string.fit_mode)
-        m.menu.add(0, 10, 0, R.string.two_page).apply {
-            isCheckable = true
-            isChecked = pdfView.twoPage
+    private fun showMenu(@Suppress("UNUSED_PARAMETER") anchor: View) {
+        val pal = Palette(this)
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Ui.rounded(pal.bg, dp(22).toFloat(), dp(1), pal.divider)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
         }
-        m.menu.add(0, 5, 0, R.string.crop_margins).apply {
-            isCheckable = true
-            isChecked = pdfView.cropMargins
-        }
-        m.menu.add(0, 6, 0, R.string.doc_info)
-        m.menu.add(0, 12, 0, R.string.save_annotated)
-        m.menu.add(0, 13, 0, R.string.organize_pages)
-        if (uri.scheme == "content") {
-            m.menu.add(0, 7, 0, R.string.share)
-            m.menu.add(0, 8, 0, R.string.open_with)
-        }
-        m.menu.add(0, 9, 0, R.string.settings_title)
-        m.setOnMenuItemClickListener {
-            when (it.itemId) {
-                1 -> askPage()
-                2 -> showBookmarks()
-                3 -> chooseFlowMode()
-                4 -> chooseFitMode()
-                5 -> {
-                    val next = !pdfView.cropMargins
-                    prefs.edit().putBoolean(SettingsActivity.CROP_MARGINS, next).apply()
-                    pdfView.cropMargins = next
-                }
-                6 -> showInfo()
-                7 -> startSafely(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("application/pdf")
-                    .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.share)))
-                8 -> startSafely(Intent.createChooser(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.open_with)))
-                9 -> startActivity(Intent(this, SettingsActivity::class.java))
-                10 -> toggleTwoPage()
-                11 -> showAnnotations()
-                12 -> startExportAnnotated()
-                13 -> startActivity(Intent(this, OrganizePagesActivity::class.java)
-                    .setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    .putExtra(OrganizePagesActivity.EXTRA_NAME, name))
+        val listBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        var dlg: AlertDialog? = null
+
+        fun addRow(labelRes: Int, checked: Boolean? = null, action: () -> Unit) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                Ui.focusable(this, 0, dp(14).toFloat(), pal.gold)
+                setOnClickListener { dlg?.dismiss(); action() }
             }
-            true
+            row.addView(TextView(this).apply {
+                text = getString(labelRes)
+                textSize = 15.5f
+                setTextColor(pal.text)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (checked != null) {
+                row.addView(TextView(this).apply {
+                    text = if (checked) "✓" else ""
+                    textSize = 13f
+                    typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE)
+                    background = Ui.rounded(if (checked) pal.accent else pal.card, dp(10).toFloat(), dp(1), pal.divider)
+                }, LinearLayout.LayoutParams(dp(24), dp(24)))
+            }
+            listBox.addView(row)
         }
-        m.show()
+
+        addRow(R.string.go_to_page) { askPage() }
+        addRow(R.string.bookmarks) { showBookmarks() }
+        addRow(R.string.notes_title) { showAnnotations() }
+        addRow(R.string.reading_mode) { chooseFlowMode() }
+        addRow(R.string.fit_mode) { chooseFitMode() }
+        addRow(R.string.two_page, checked = pdfView.twoPage) { toggleTwoPage() }
+        addRow(R.string.crop_margins, checked = pdfView.cropMargins) {
+            val next = !pdfView.cropMargins
+            prefs.edit().putBoolean(SettingsActivity.CROP_MARGINS, next).apply()
+            pdfView.cropMargins = next
+        }
+        addRow(R.string.doc_info) { showInfo() }
+        addRow(R.string.save_annotated) { startExportAnnotated() }
+        addRow(R.string.organize_pages) {
+            startActivity(Intent(this, OrganizePagesActivity::class.java)
+                .setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .putExtra(OrganizePagesActivity.EXTRA_NAME, name))
+        }
+        if (uri.scheme == "content") {
+            addRow(R.string.share) {
+                startSafely(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("application/pdf")
+                    .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.share)))
+            }
+            addRow(R.string.open_with) {
+                startSafely(Intent.createChooser(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.open_with)))
+            }
+        }
+        addRow(R.string.settings_title) { startActivity(Intent(this, SettingsActivity::class.java)) }
+
+        val scroll = android.widget.ScrollView(this).apply { addView(listBox) }
+        card.addView(scroll)
+        dlg = AlertDialog.Builder(this).setView(card).create()
+        dlg.show()
+        dlg.window?.setBackgroundDrawableResource(android.R.color.transparent)
     }
 
     private fun startExportAnnotated() {

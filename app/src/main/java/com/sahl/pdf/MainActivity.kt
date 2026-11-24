@@ -51,8 +51,18 @@ class MainActivity : Activity() {
     private lateinit var tabRecent: TextView
     private lateinit var tabDevice: TextView
     private lateinit var updateChip: TextView
+    private lateinit var searchBox: android.widget.EditText
+    private lateinit var bulkBar: LinearLayout
+    private lateinit var bulkCount: TextView
+    private lateinit var bulkMergeBtn: TextView
+    private lateinit var bulkShareBtn: TextView
+    private lateinit var bulkRemoveBtn: TextView
     private var deviceTab = false
+    private var allRows: List<Row> = emptyList()
     private var rows: List<Row> = emptyList()
+    private var filterQuery = ""
+    private var multiSelect = false
+    private val selectedUris = LinkedHashSet<String>()
     private var cachedDeviceRows: List<Row>? = null
     private val io = Executors.newFixedThreadPool(2)
     private val thumbs = LruCache<String, Bitmap>(8 * 1024 * 1024)
@@ -173,16 +183,55 @@ class MainActivity : Activity() {
         tabDevice = tab(R.string.tab_device) { selectTab(true) }
         tabs.addView(tabRecent)
         tabs.addView(tabDevice, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        tabs.addView(View(this), LinearLayout.LayoutParams(0, 0, 1f))
         if (Ui.isTv(this)) {
             val sendBtn = tab(R.string.send_from_phone) { showWifiTransfer() }.apply {
                 Ui.focusable(this, pal.card, dp(18).toFloat(), pal.gold)
                 setTextColor(pal.accent)
                 typeface = Typeface.DEFAULT_BOLD
             }
-            tabs.addView(View(this), LinearLayout.LayoutParams(0, 0, 1f))
-            tabs.addView(sendBtn)
+            tabs.addView(sendBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
         }
+        val selectBtn = tab(R.string.select_mode) { toggleMultiSelect(!multiSelect) }.apply {
+            Ui.focusable(this, pal.card, dp(18).toFloat(), pal.gold)
+            setTextColor(pal.text)
+        }
+        tabs.addView(selectBtn)
         root.addView(tabs)
+
+        val searchWrap = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Ui.rounded(pal.card, dp(16).toFloat(), dp(1), pal.divider)
+            setPadding(dp(14), dp(4), dp(8), dp(4))
+        }
+        searchBox = android.widget.EditText(this).apply {
+            hint = getString(R.string.search_files_hint)
+            setTextColor(pal.text)
+            setHintTextColor(pal.sub)
+            textSize = 14.5f
+            isSingleLine = true
+            background = null
+            setPadding(0, dp(6), dp(6), dp(6))
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    filterQuery = s?.toString()?.trim() ?: ""
+                    applyFilter()
+                }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+        }
+        searchWrap.addView(searchBox, LinearLayout.LayoutParams(0, -2, 1f))
+        searchWrap.addView(TextView(this).apply {
+            text = "✕"
+            textSize = 15f
+            setTextColor(pal.sub)
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setOnClickListener { searchBox.setText("") }
+        })
+        root.addView(searchWrap, LinearLayout.LayoutParams(-1, -2).apply { setMargins(dp(16), 0, dp(16), dp(8)) })
 
         val body = android.widget.FrameLayout(this)
         list = ListView(this).apply {
@@ -191,8 +240,16 @@ class MainActivity : Activity() {
             setPadding(dp(8), 0, dp(8), dp(16))
             clipToPadding = false
             adapter = RowAdapter()
-            setOnItemClickListener { _, _, pos, _ -> openRow(rows[pos]) }
-            setOnItemLongClickListener { _, _, pos, _ -> rowMenu(rows[pos]); true }
+            setOnItemClickListener { _, _, pos, _ ->
+                val r = rows[pos]
+                if (multiSelect) toggleRowSelection(r) else openRow(r)
+            }
+            setOnItemLongClickListener { _, _, pos, _ ->
+                val r = rows[pos]
+                if (!multiSelect) toggleMultiSelect(true)
+                toggleRowSelection(r)
+                true
+            }
         }
         body.addView(list, android.widget.FrameLayout.LayoutParams(-1, -1))
 
@@ -218,6 +275,33 @@ class MainActivity : Activity() {
         empty.addView(accessButton)
         body.addView(empty, android.widget.FrameLayout.LayoutParams(-1, -1))
         root.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        bulkBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(pal.card)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            visibility = View.GONE
+        }
+        bulkCount = TextView(this).apply {
+            setTextColor(pal.text); textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+        }
+        bulkBar.addView(bulkCount, LinearLayout.LayoutParams(0, -2, 1f))
+        fun bulkBtn(labelRes: Int, bg: Int, fg: Int, click: () -> Unit) = TextView(this).apply {
+            text = getString(labelRes)
+            setTextColor(fg); textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            Ui.focusable(this, bg, dp(14).toFloat(), pal.gold)
+            setOnClickListener { click() }
+        }
+        bulkMergeBtn = bulkBtn(R.string.merge_short, pal.accent, Color.WHITE) { mergeSelected() }
+        bulkShareBtn = bulkBtn(R.string.share, pal.bg, pal.text) { shareSelected() }
+        bulkRemoveBtn = bulkBtn(R.string.remove_recent, Color.parseColor("#B83B3B"), Color.WHITE) { removeSelected() }
+        bulkBar.addView(bulkMergeBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        bulkBar.addView(bulkShareBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        bulkBar.addView(bulkRemoveBtn, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        bulkBar.addView(bulkBtn(R.string.done, pal.bg, pal.sub) { toggleMultiSelect(false) })
+        root.addView(bulkBar)
 
         setContentView(root)
         styleTabs()
@@ -249,13 +333,13 @@ class MainActivity : Activity() {
 
     private fun refresh() {
         if (!deviceTab) {
-            rows = Library.all(this).map { b ->
+            allRows = Library.all(this).map { b ->
                 val parts = ArrayList<String>()
                 if (b.pages > 0) parts += getString(R.string.page_of, b.page + 1, b.pages)
                 parts += DateUtils.getRelativeTimeSpanString(b.opened, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
                 Row(Uri.parse(b.uri), b.name, parts.joinToString(" · "), b.key, b)
             }
-            show(R.string.empty_recent, needAccess = false)
+            applyFilter()
             if (cachedDeviceRows == null && hasAccess()) {
                 io.execute {
                     val found = queryDevicePdfs()
@@ -265,13 +349,14 @@ class MainActivity : Activity() {
             return
         }
         if (!hasAccess()) {
+            allRows = emptyList()
             rows = emptyList()
             show(R.string.device_access_body, needAccess = true)
             return
         }
         cachedDeviceRows?.let { cached ->
-            rows = cached
-            show(R.string.empty_device, needAccess = false)
+            allRows = cached
+            applyFilter()
         }
         io.execute {
             val found = queryDevicePdfs()
@@ -279,10 +364,81 @@ class MainActivity : Activity() {
                 if (isFinishing) return@runOnUiThread
                 cachedDeviceRows = found
                 if (!deviceTab) return@runOnUiThread
-                rows = found
-                show(R.string.empty_device, needAccess = false)
+                allRows = found
+                applyFilter()
             }
         }
+    }
+
+    private fun applyFilter() {
+        rows = if (filterQuery.isEmpty()) allRows
+        else allRows.filter { it.name.contains(filterQuery, ignoreCase = true) }
+        val emptyRes = if (filterQuery.isNotEmpty()) R.string.search_files_empty
+        else if (deviceTab) R.string.empty_device else R.string.empty_recent
+        show(emptyRes, needAccess = deviceTab && !hasAccess())
+    }
+
+    private fun toggleMultiSelect(on: Boolean) {
+        multiSelect = on
+        if (!on) selectedUris.clear()
+        updateBulkBar()
+        (list.adapter as BaseAdapter).notifyDataSetChanged()
+    }
+
+    private fun toggleRowSelection(r: Row) {
+        val k = r.uri.toString()
+        if (!selectedUris.add(k)) selectedUris.remove(k)
+        if (selectedUris.isEmpty()) multiSelect = false
+        updateBulkBar()
+        (list.adapter as BaseAdapter).notifyDataSetChanged()
+    }
+
+    private fun selectedRows(): List<Row> {
+        val byUri = allRows.associateBy { it.uri.toString() }
+        return selectedUris.mapNotNull { byUri[it] }
+    }
+
+    private fun updateBulkBar() {
+        bulkBar.visibility = if (multiSelect) View.VISIBLE else View.GONE
+        if (!multiSelect) return
+        val sel = selectedRows()
+        bulkCount.text = getString(R.string.selected_count, sel.size)
+        bulkMergeBtn.visibility = if (sel.size >= 2) View.VISIBLE else View.GONE
+        bulkShareBtn.visibility = if (sel.any { it.uri.scheme == "content" }) View.VISIBLE else View.GONE
+        bulkRemoveBtn.visibility = if (!deviceTab && sel.any { it.book != null }) View.VISIBLE else View.GONE
+    }
+
+    private fun mergeSelected() {
+        val uris = ArrayList<Uri>(selectedRows().map { it.uri })
+        if (uris.size < 2) return
+        toggleMultiSelect(false)
+        startActivity(Intent(this, MergeActivity::class.java).putParcelableArrayListExtra(MergeActivity.EXTRA_URIS, uris))
+    }
+
+    private fun shareSelected() {
+        val uris = ArrayList<Uri>(selectedRows().map { it.uri }.filter { it.scheme == "content" })
+        if (uris.isEmpty()) return
+        val intent = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).setType("application/pdf").putExtra(Intent.EXTRA_STREAM, uris[0])
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).setType("application/pdf").putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        }
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        start(Intent.createChooser(intent, getString(R.string.share)))
+    }
+
+    private fun removeSelected() {
+        for (r in selectedRows()) {
+            r.book?.let { Library.remove(this, it.key) }
+        }
+        toggleMultiSelect(false)
+        refresh()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (multiSelect) { toggleMultiSelect(false); return }
+        @Suppress("DEPRECATION") super.onBackPressed()
     }
 
     private fun show(emptyMsg: Int, needAccess: Boolean) {
@@ -467,6 +623,7 @@ class MainActivity : Activity() {
             val r = rows[position]
             val thumb = row.getChildAt(0) as ImageView
             val texts = row.getChildAt(1) as LinearLayout
+            val check = row.getChildAt(2) as TextView
             (texts.getChildAt(0) as TextView).text = r.name.removeSuffix(".pdf").removeSuffix(".PDF")
             val subText = r.sub.ifEmpty {
                 if (r.size > 0L || r.dateMs > 0L) {
@@ -476,6 +633,11 @@ class MainActivity : Activity() {
             }
             (texts.getChildAt(1) as TextView).text = subText
             bindThumb(thumb, r.key?.takeIf { r.book != null })
+            val isSel = multiSelect && selectedUris.contains(r.uri.toString())
+            check.visibility = if (multiSelect) View.VISIBLE else View.GONE
+            check.text = if (isSel) "✓" else ""
+            check.background = Ui.rounded(if (isSel) pal.accent else pal.card, dp(12).toFloat(), dp(1), if (isSel) pal.accent else pal.divider)
+            row.background = if (isSel) Ui.rounded(pal.card, dp(14).toFloat(), dp(1), pal.gold) else null
             return row
         }
 
@@ -490,13 +652,18 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(dp(46), dp(62)))
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(dp(14), 0, dp(4), 0)
+                setPadding(dp(14), 0, dp(8), 0)
                 addView(TextView(context).apply {
                     setTextColor(pal.text); textSize = 15.5f; typeface = Typeface.DEFAULT_BOLD
                     maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
                 })
                 addView(TextView(context).apply { setTextColor(pal.sub); textSize = 13f; maxLines = 1 })
             }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(TextView(context).apply {
+                setTextColor(Color.WHITE); textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER
+                visibility = View.GONE
+            }, LinearLayout.LayoutParams(dp(24), dp(24)))
         }
     }
 

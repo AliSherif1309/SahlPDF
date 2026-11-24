@@ -117,4 +117,9 @@
     <string name="filter_original">أصلي</string>
     <string name="filter_enhanced">محسّن</string>
     <string name="filter_bw">أبيض وأسود</string>
+    <string name="select_mode">تحديد</string>
+    <string name="selected_count">تم تحديد %1$d</string>
+    <string name="merge_short">دمج</string>
+    <string name="search_files_hint">ابحث في الملفات…</string>
+    <string name="search_files_empty">لا توجد ملفات مطابقة.</string>
 </resources>
