@@ -44,6 +44,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private lateinit var searchCount: TextView
     private lateinit var pageLabel: TextView
     private lateinit var pagePill: TextView
+    private lateinit var selectionBar: LinearLayout
     private lateinit var seek: SeekBar
     private lateinit var progress: ProgressBar
 
@@ -247,6 +248,28 @@ class ReaderActivity : Activity(), PdfView.Listener {
             bottomMargin = dp(24)
         })
 
+        selectionBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = Ui.rounded(Color.parseColor("#EB0B110F"), dp(22).toFloat(), dp(1), Color.parseColor("#33FFFFFF"))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            visibility = View.GONE
+        }
+        fun selBtn(label: Int, click: () -> Unit) = TextView(this).apply {
+            text = getString(label)
+            setTextColor(Color.WHITE); textSize = 13.5f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            Ui.focusable(this, Color.TRANSPARENT, dp(16).toFloat(), Color.parseColor("#F5C84C"))
+            setOnClickListener { click() }
+        }
+        selectionBar.addView(selBtn(R.string.copy) { copySelection() })
+        selectionBar.addView(selBtn(R.string.highlight) { saveSelection(withNote = false) })
+        selectionBar.addView(selBtn(R.string.add_note) { saveSelection(withNote = true) })
+        selectionBar.addView(icon(R.drawable.ic_close, android.R.string.cancel) { pdfView.clearSelection() })
+        root.addView(selectionBar, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = dp(72)
+        })
+
         progress = ProgressBar(this)
         root.addView(progress, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER))
 
@@ -343,6 +366,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         val start = saved?.page?.coerceIn(0, d.pageCount - 1) ?: 0
         seek.max = d.pageCount - 1
         pdfView.setDocument(d, start)
+        pdfView.setAnnotations(Library.annotations(this, key))
         updateLabel(start)
         Library.upsert(this, Book(key, uri.toString(), name, size, d.pageCount, start, System.currentTimeMillis()))
         val thumb = Library.thumb(this, key)
@@ -537,6 +561,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         val m = PopupMenu(this, anchor)
         m.menu.add(0, 1, 0, R.string.go_to_page)
         m.menu.add(0, 2, 0, R.string.bookmarks)
+        m.menu.add(0, 11, 0, R.string.notes_title)
         m.menu.add(0, 3, 0, R.string.reading_mode)
         m.menu.add(0, 4, 0, R.string.fit_mode)
         m.menu.add(0, 10, 0, R.string.two_page).apply {
@@ -571,6 +596,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), getString(R.string.open_with)))
                 9 -> startActivity(Intent(this, SettingsActivity::class.java))
                 10 -> toggleTwoPage()
+                11 -> showAnnotations()
             }
             true
         }
@@ -582,6 +608,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
             R.string.contents to { showContents() },
             R.string.go_to_page to { askPage() },
             R.string.bookmarks to { showBookmarks() },
+            R.string.notes_title to { showAnnotations() },
             R.string.search to { openSearch() },
             R.string.one_or_two_pages to { toggleTwoPage() },
             R.string.reading_mode to { chooseFlowMode() },
@@ -599,6 +626,63 @@ class ReaderActivity : Activity(), PdfView.Listener {
         AlertDialog.Builder(this)
             .setTitle(R.string.tv_menu)
             .setItems(labels) { _, which -> items[which].second() }
+            .show()
+    }
+
+    private fun copyText(text: String) {
+        getSystemService(android.content.ClipboardManager::class.java)
+            .setPrimaryClip(android.content.ClipData.newPlainText("pdf", text))
+        Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun copySelection() {
+        val sel = pdfView.selection ?: return
+        copyText(sel.text)
+        pdfView.clearSelection()
+    }
+
+    private fun saveSelection(withNote: Boolean) {
+        val sel = pdfView.selection ?: return
+        if (!withNote) {
+            Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, "")
+            pdfView.setAnnotations(Library.annotations(this, key))
+            pdfView.clearSelection()
+            return
+        }
+        val input = EditText(this).apply { hint = getString(R.string.note_hint) }
+        val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.add_note)
+            .setMessage(sel.text.take(140))
+            .setView(box)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                Library.addAnnotation(this, key, sel.page, sel.rects, sel.text, input.text.toString().trim())
+                pdfView.setAnnotations(Library.annotations(this, key))
+                pdfView.clearSelection()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showAnnotations() {
+        val list = Library.annotations(this, key)
+        if (list.isEmpty()) {
+            Toast.makeText(this, R.string.no_notes, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = list.map { a ->
+            val pStr = getString(R.string.page_short, a.page + 1, pdfView.pageCount)
+            val body = a.note.ifBlank { a.text }.replace('\n', ' ').take(60)
+            "$pStr  ·  $body"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.notes_title)
+            .setItems(labels) { _, which ->
+                val item = list[which]
+                pdfView.goTo(item.page)
+                updateLabel(item.page)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
@@ -642,6 +726,50 @@ class ReaderActivity : Activity(), PdfView.Listener {
     override fun onTap() {
         if (searchOpen) return
         setBars(!barsShown)
+    }
+
+    override fun onLinkTap(link: PageLink) {
+        if (link.destPage != null) {
+            pdfView.goTo(link.destPage)
+            updateLabel(link.destPage)
+        } else if (link.uri != null) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.open_link)
+                .setMessage(link.uri)
+                .setPositiveButton(R.string.open) { _, _ -> startSafely(Intent(Intent.ACTION_VIEW, Uri.parse(link.uri))) }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    override fun onSelectionChanged(selection: TextSelection?) {
+        selectionBar.visibility = if (selection != null) View.VISIBLE else View.GONE
+    }
+
+    override fun onAnnotationTap(entry: Library.AnnotationEntry) {
+        val msg = if (entry.note.isNotBlank()) "${entry.text}\n\n📝 ${entry.note}" else entry.text
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.page_of, entry.page + 1, pdfView.pageCount))
+            .setMessage(msg)
+            .setPositiveButton(R.string.edit_note) { _, _ ->
+                val input = EditText(this).apply { setText(entry.note); hint = getString(R.string.note_hint) }
+                val box = FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(input) }
+                AlertDialog.Builder(this)
+                    .setTitle(R.string.edit_note)
+                    .setView(box)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        Library.updateAnnotationNote(this, key, entry.id, input.text.toString().trim())
+                        pdfView.setAnnotations(Library.annotations(this, key))
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            .setNeutralButton(R.string.copy) { _, _ -> copyText(entry.text) }
+            .setNegativeButton(R.string.delete) { _, _ ->
+                Library.removeAnnotation(this, key, entry.id)
+                pdfView.setAnnotations(Library.annotations(this, key))
+            }
+            .show()
     }
 
     // ---- keys (TV remote, keyboards) -----------------------------------------------------

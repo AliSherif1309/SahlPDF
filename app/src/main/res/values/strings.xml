@@ -66,4 +66,14 @@
     <string name="received_count">Received: %d</string>
     <string name="tv_menu">Reader menu</string>
     <string name="toolbars">Show / hide toolbars</string>
+    <string name="copy">Copy</string>
+    <string name="copied">Copied</string>
+    <string name="highlight">Highlight</string>
+    <string name="add_note">Note</string>
+    <string name="edit_note">Edit note</string>
+    <string name="note_hint">Write a note…</string>
+    <string name="notes_title">Highlights &amp; notes</string>
+    <string name="no_notes">No highlights or notes yet.</string>
+    <string name="delete">Delete</string>
+    <string name="open_link">Open link?</string>
 </resources>

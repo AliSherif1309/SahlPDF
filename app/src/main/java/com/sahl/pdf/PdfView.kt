@@ -34,6 +34,9 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     interface Listener {
         fun onPageChanged(page: Int, count: Int)
         fun onTap()
+        fun onLinkTap(link: PageLink)
+        fun onSelectionChanged(selection: TextSelection?)
+        fun onAnnotationTap(entry: Library.AnnotationEntry)
     }
 
     var listener: Listener? = null
@@ -85,6 +88,10 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
 
     private var searchHits: List<SearchHit> = emptyList()
     private var activeHitIndex = -1
+    private var annotations: List<Library.AnnotationEntry> = emptyList()
+    var selection: TextSelection? = null; private set
+    private val linksCache = HashMap<Int, List<PageLink>>()
+    private val linksPending = HashSet<Int>()
 
     private val scroller = OverScroller(context)
     private var zoomAnim: ValueAnimator? = null
@@ -101,6 +108,9 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private val shadow = Paint().apply { color = 0x22000000 }
     private val hitPaint = Paint().apply { color = 0x55F5C84C }
     private val activeHitPaint = Paint().apply { color = 0x99F5C84C.toInt() }
+    private val annPaint = Paint().apply { color = 0x554CAF50 }
+    private val noteDotPaint = Paint().apply { color = 0xFFF5C84C.toInt() }
+    private val selPaint = Paint().apply { color = 0x550E6B4E }
     private val dst = RectF()
 
     var night = false
@@ -119,7 +129,9 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     fun setDocument(d: PdfDoc, startPage: Int) {
         doc = d
         crops.clear(); cropPending.clear()
+        linksCache.clear(); linksPending.clear()
         searchHits = emptyList(); activeHitIndex = -1
+        selection = null
         cache.evictAll(); details.clear()
         zoom = 1f; sx = 0f; sy = 0f
         pendingPage = startPage.coerceIn(0, d.pageCount - 1)
@@ -127,6 +139,18 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         currentPage = -1
         buildLayout()
         if (width > 0 && height > 0) relayout()
+        invalidate()
+    }
+
+    fun setAnnotations(list: List<Library.AnnotationEntry>) {
+        annotations = list
+        invalidate()
+    }
+
+    fun clearSelection() {
+        if (selection == null) return
+        selection = null
+        listener?.onSelectionChanged(null)
         invalidate()
     }
 
@@ -305,29 +329,39 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         requestRenders(visiblePages)
     }
 
-    private fun drawHighlights(canvas: Canvas, pageIdx: Int, pageDst: RectF) {
-        if (searchHits.isEmpty()) return
+    private fun drawNormRects(canvas: Canvas, pageIdx: Int, pageDst: RectF, rects: List<NormRect>, paint: Paint, dot: Boolean = false) {
         val crop = cropFor(pageIdx)
         val cw = max(0.05f, crop.width)
         val ch = max(0.05f, crop.height)
+        for (idx in rects.indices) {
+            val nr = rects[idx]
+            val rl = ((nr.left - crop.left) / cw).coerceIn(0f, 1f)
+            val rt = ((nr.top - crop.top) / ch).coerceIn(0f, 1f)
+            val rr = ((nr.right - crop.left) / cw).coerceIn(0f, 1f)
+            val rb = ((nr.bottom - crop.top) / ch).coerceIn(0f, 1f)
+            if (rr <= rl || rb <= rt) continue
+            val l = pageDst.left + rl * pageDst.width()
+            val t = pageDst.top + rt * pageDst.height()
+            val r = pageDst.left + rr * pageDst.width()
+            val b = pageDst.top + rb * pageDst.height()
+            canvas.drawRect(l, t, r, b, paint)
+            if (dot && idx == 0) canvas.drawCircle(r, t, 4 * dp, noteDotPaint)
+        }
+    }
+
+    private fun drawHighlights(canvas: Canvas, pageIdx: Int, pageDst: RectF) {
+        for (a in annotations) {
+            if (a.page == pageIdx) drawNormRects(canvas, pageIdx, pageDst, a.rects, annPaint, dot = a.note.isNotBlank())
+        }
         for (idx in searchHits.indices) {
             val hit = searchHits[idx]
-            if (hit.page != pageIdx) continue
-            val paint = if (idx == activeHitIndex) activeHitPaint else hitPaint
-            for (nr in hit.rects) {
-                val rl = ((nr.left - crop.left) / cw).coerceIn(0f, 1f)
-                val rt = ((nr.top - crop.top) / ch).coerceIn(0f, 1f)
-                val rr = ((nr.right - crop.left) / cw).coerceIn(0f, 1f)
-                val rb = ((nr.bottom - crop.top) / ch).coerceIn(0f, 1f)
-                if (rr <= rl || rb <= rt) continue
-                canvas.drawRect(
-                    pageDst.left + rl * pageDst.width(),
-                    pageDst.top + rt * pageDst.height(),
-                    pageDst.left + rr * pageDst.width(),
-                    pageDst.top + rb * pageDst.height(),
-                    paint,
-                )
+            if (hit.page == pageIdx) {
+                drawNormRects(canvas, pageIdx, pageDst, hit.rects, if (idx == activeHitIndex) activeHitPaint else hitPaint)
             }
+        }
+        val sel = selection
+        if (sel != null && sel.page == pageIdx) {
+            drawNormRects(canvas, pageIdx, pageDst, sel.rects, selPaint)
         }
     }
 
@@ -444,9 +478,34 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     // ---- gestures ----------------------------------------------------------------------
 
     private var scaling = false
+    private var selectingDrag = false
+    private var selectAnchorChar = -1
+    private var selectPage = -1
+
+    /** Maps screen (x, y) to (pageIndex, normX, normY) in uncropped [0..1] page coordinates. */
+    private fun hitTestPage(x: Float, y: Float): Triple<Int, Float, Float>? {
+        val l = layout ?: return null
+        val bx = (x + sx) / zoom
+        val by = (y + sy) / zoom
+        val vis = l.visible(bx, by, bx, by)
+        for (i in vis) {
+            if (bx >= l.left(i) && bx <= l.right(i) && by >= l.top(i) && by <= l.bottom(i)) {
+                val fx = ((bx - l.left(i)) / max(1f, l.width(i))).coerceIn(0f, 1f)
+                val fy = ((by - l.top(i)) / max(1f, l.height(i))).coerceIn(0f, 1f)
+                val crop = cropFor(i)
+                val nx = (crop.left + fx * crop.width).coerceIn(0f, 1f)
+                val ny = (crop.top + fy * crop.height).coerceIn(0f, 1f)
+                return Triple(i, nx, ny)
+            }
+        }
+        return null
+    }
+
+    private fun hitNorm(nx: Float, ny: Float, r: NormRect, pad: Float = 0.012f): Boolean =
+        nx >= r.left - pad && nx <= r.right + pad && ny >= r.top - pad && ny <= r.bottom + pad
 
     private val scale = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean { scaling = true; stopMotion(); return true }
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean { scaling = true; selectingDrag = false; stopMotion(); return true }
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             zoomTo(zoom * detector.scaleFactor, detector.focusX, detector.focusY); return true
         }
@@ -456,11 +515,11 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean { stopMotion(); return true }
         override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
-            if (scaling) return true
+            if (scaling || selectingDrag) return true
             sx += dx; sy += dy; clamp(); notifyPage(); invalidate(); return true
         }
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
-            if (scaling) return true
+            if (scaling || selectingDrag) return true
             if (flowMode != FlowMode.VERTICAL && zoom <= 1.01f) {
                 val l = layout ?: return true
                 val cur = l.pageAt((sx + width * 0.5f) / zoom, (sy + height * 0.5f) / zoom)
@@ -477,7 +536,57 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
                 0, maxX().roundToInt(), 0, maxY().roundToInt())
             postInvalidateOnAnimation(); return true
         }
-        override fun onSingleTapConfirmed(e: MotionEvent): Boolean { listener?.onTap(); return true }
+        override fun onLongPress(e: MotionEvent) {
+            if (scaling) return
+            val d = doc ?: return
+            val hit = hitTestPage(e.x, e.y) ?: return
+            val (p, nx, ny) = hit
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            renderer.call({ d.selectWordAt(p, nx, ny) }) { r ->
+                val sel = r.getOrNull() ?: return@call
+                if (doc !== d) return@call
+                selection = sel
+                selectAnchorChar = sel.startChar
+                selectPage = p
+                selectingDrag = true
+                listener?.onSelectionChanged(sel)
+                invalidate()
+            }
+        }
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+            if (selection != null) {
+                clearSelection()
+                return true
+            }
+            val hit = hitTestPage(e.x, e.y)
+            if (hit != null) {
+                val (p, nx, ny) = hit
+                val ann = annotations.firstOrNull { a -> a.page == p && a.rects.any { hitNorm(nx, ny, it) } }
+                if (ann != null) {
+                    listener?.onAnnotationTap(ann)
+                    return true
+                }
+                val d = doc
+                val cached = linksCache[p]
+                if (cached != null) {
+                    val link = cached.firstOrNull { hitNorm(nx, ny, it.bounds) }
+                    if (link != null) { listener?.onLinkTap(link); return true }
+                } else if (d != null) {
+                    renderer.call({ d.links(p) }) { r ->
+                        val links = r.getOrDefault(emptyList())
+                        if (doc === d) {
+                            linksCache[p] = links
+                            val link = links.firstOrNull { hitNorm(nx, ny, it.bounds) }
+                            if (link != null) listener?.onLinkTap(link)
+                            else listener?.onTap()
+                        }
+                    }
+                    return true
+                }
+            }
+            listener?.onTap()
+            return true
+        }
         override fun onDoubleTap(e: MotionEvent): Boolean {
             animateZoom(if (zoom < 1.6f) 2.5f else 1f, e.x, e.y); return true
         }
@@ -494,8 +603,25 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scale.onTouchEvent(event)
+        if (selectingDrag && event.actionMasked == MotionEvent.ACTION_MOVE) {
+            val d = doc
+            val hit = hitTestPage(event.x, event.y)
+            if (d != null && hit != null && hit.first == selectPage && selectAnchorChar >= 0) {
+                val (p, nx, ny) = hit
+                renderer.call({ d.selectRange(p, selectAnchorChar, nx, ny) }) { r ->
+                    val sel = r.getOrNull() ?: return@call
+                    if (doc === d && selection != null) {
+                        selection = sel
+                        listener?.onSelectionChanged(sel)
+                        invalidate()
+                    }
+                }
+            }
+            return true
+        }
         val handled = gestures.onTouchEvent(event)
-        if ((event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL)) {
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            selectingDrag = false
             if (!handled && flowMode != FlowMode.VERTICAL && zoom <= 1.01f && scroller.isFinished && !scaling) {
                 val l = layout
                 if (l != null) snapTo(l.pageAt((sx + width * 0.5f) / zoom, (sy + height * 0.5f) / zoom))

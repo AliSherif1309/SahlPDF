@@ -19,6 +19,18 @@ data class TocItem(val title: String, val page: Int, val depth: Int)
 /** One search match on [page] with normalized [0..1] highlight boxes. */
 data class SearchHit(val page: Int, val rects: List<NormRect>)
 
+/** A clickable link on a page with normalized [0..1] bounds. */
+data class PageLink(val bounds: NormRect, val destPage: Int?, val uri: String?)
+
+/** A selected text span on [page] with normalized [0..1] boxes. */
+data class TextSelection(
+    val page: Int,
+    val startChar: Int,
+    val endChar: Int,
+    val text: String,
+    val rects: List<NormRect>,
+)
+
 /**
  * An open PDF. Not thread-safe: every call must happen on the [Renderer] thread.
  */
@@ -99,6 +111,79 @@ class PdfDoc private constructor(
             }
         }
         return hits
+    }
+
+    fun links(i: Int): List<PageLink> {
+        val out = ArrayList<PageLink>()
+        runCatching {
+            val p = page(i)
+            for (l in p.getPageLinks()) {
+                val dr = p.mapRectToDevice(0, 0, 10000, 10000, 0, l.bounds)
+                val left = minOf(dr.left, dr.right) / 10000f
+                val top = minOf(dr.top, dr.bottom) / 10000f
+                val right = maxOf(dr.left, dr.right) / 10000f
+                val bottom = maxOf(dr.top, dr.bottom) / 10000f
+                if (right > left && bottom > top) {
+                    val dest = l.destPageIdx?.takeIf { it in 0 until pageCount }
+                    val uri = l.uri?.takeIf { it.isNotBlank() }
+                    if (dest != null || uri != null) out += PageLink(NormRect(left, top, right, bottom), dest, uri)
+                }
+            }
+        }
+        return out
+    }
+
+    fun selectWordAt(pageIdx: Int, nx: Float, ny: Float): TextSelection? = runCatching {
+        val p = page(pageIdx)
+        val pt = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (nx * 10000f).toInt(), (ny * 10000f).toInt())
+        p.openTextPage().use { tp ->
+            val total = tp.textPageCountChars()
+            if (total <= 0) return null
+            val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 16.0, 16.0)
+            if (idx !in 0 until total) return null
+            var start = idx
+            var end = idx
+            while (start > 0 && !tp.textPageGetUnicode(start - 1).isWhitespace()) start--
+            while (end + 1 < total && !tp.textPageGetUnicode(end + 1).isWhitespace()) end++
+            buildSelection(p, tp, pageIdx, start, end)
+        }
+    }.getOrNull()
+
+    fun selectRange(pageIdx: Int, anchorChar: Int, nx: Float, ny: Float): TextSelection? = runCatching {
+        val p = page(pageIdx)
+        val pt = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (nx * 10000f).toInt(), (ny * 10000f).toInt())
+        p.openTextPage().use { tp ->
+            val total = tp.textPageCountChars()
+            if (total <= 0) return null
+            val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 24.0, 24.0)
+            if (idx !in 0 until total) return null
+            val a = anchorChar.coerceIn(0, total - 1)
+            buildSelection(p, tp, pageIdx, minOf(a, idx), maxOf(a, idx))
+        }
+    }.getOrNull()
+
+    private fun buildSelection(
+        p: PdfPage,
+        tp: io.legere.pdfiumandroid.PdfTextPage,
+        pageIdx: Int,
+        start: Int,
+        end: Int,
+    ): TextSelection? {
+        val count = end - start + 1
+        val text = tp.textPageGetText(start, count)?.trim().orEmpty()
+        if (text.isEmpty()) return null
+        val nRects = tp.textPageCountRects(start, count)
+        val rects = ArrayList<NormRect>(nRects)
+        for (r in 0 until nRects) {
+            val pr = tp.textPageGetRect(r) ?: continue
+            val dr = p.mapRectToDevice(0, 0, 10000, 10000, 0, pr)
+            val left = minOf(dr.left, dr.right) / 10000f
+            val top = minOf(dr.top, dr.bottom) / 10000f
+            val right = maxOf(dr.left, dr.right) / 10000f
+            val bottom = maxOf(dr.top, dr.bottom) / 10000f
+            if (right > left && bottom > top) rects += NormRect(left, top, right, bottom)
+        }
+        return if (rects.isEmpty()) null else TextSelection(pageIdx, start, end, text, rects)
     }
 
     fun toc(): List<TocItem> {
