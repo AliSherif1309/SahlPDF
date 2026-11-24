@@ -201,30 +201,24 @@ class ScanActivity : Activity() {
     private fun scanDir(): File = File(cacheDir, "scans").apply { mkdirs() }
 
     private fun takePhoto() {
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.CAMERA), REQ_CAM_PERM)
+            return
+        }
         val file = File(scanDir(), "scan_${System.currentTimeMillis()}.jpg")
         pendingPhotoFile = file
-        val uri = SahlFileProvider.uriFor(this, file)
-        val i = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-            putExtra(MediaStore.EXTRA_OUTPUT, uri)
-            clipData = android.content.ClipData.newRawUri("", uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        }
-        try {
-            val handlers = packageManager.queryIntentActivities(i, 0)
-            for (ri in handlers) {
-                grantUriPermission(
-                    ri.activityInfo.packageName,
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                )
-            }
-            startActivityForResult(i, REQ_CAMERA)
-        } catch (e: Exception) {
-            try {
-                startActivityForResult(Intent(MediaStore.ACTION_IMAGE_CAPTURE), REQ_CAMERA)
-            } catch (e2: Exception) {
-                Toast.makeText(this, e2.localizedMessage ?: e.localizedMessage ?: getString(R.string.cannot_open), Toast.LENGTH_LONG).show()
-            }
+        startActivityForResult(
+            Intent(this, CameraScanActivity::class.java).putExtra(CameraScanActivity.EXTRA_OUTPUT_PATH, file.path),
+            REQ_CAMERA,
+        )
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_CAM_PERM && grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            takePhoto()
+        } else if (requestCode == REQ_CAM_PERM) {
+            Toast.makeText(this, R.string.camera_permission_needed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -397,5 +391,6 @@ class ScanActivity : Activity() {
         private const val REQ_CAMERA = 71
         private const val REQ_GALLERY = 72
         private const val REQ_SAVE = 73
+        private const val REQ_CAM_PERM = 74
     }
 }
