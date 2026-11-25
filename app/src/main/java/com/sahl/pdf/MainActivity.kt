@@ -169,8 +169,10 @@ class MainActivity : Activity() {
             Ui.focusable(this, pal.card, dp(16).toFloat(), pal.gold)
             setOnClickListener { click() }
         }
-        toolsRow.addView(toolCard(R.string.scan_to_pdf) { startActivity(Intent(this, ScanActivity::class.java)) },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
+        if (!Ui.isTv(this)) {
+            toolsRow.addView(toolCard(R.string.scan_to_pdf) { startActivity(Intent(this, ScanActivity::class.java)) },
+                LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
+        }
         toolsRow.addView(toolCard(R.string.merge_pdfs) { startActivity(Intent(this, MergeActivity::class.java)) },
             LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(toolsRow)

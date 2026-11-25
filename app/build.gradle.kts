@@ -75,6 +75,8 @@ dependencies {
     implementation("io.legere:pdfiumandroid:1.0.35")
     // PdfiumAndroidKt declares coroutines as compileOnly, so the app must provide it at runtime.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // Optional Google Play Services ML Kit Document Scanner (~300KB client; falls back gracefully if Play Services is absent).
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
 
     testImplementation("junit:junit:4.13.2")
 }

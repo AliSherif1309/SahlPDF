@@ -20,6 +20,9 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -28,8 +31,8 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * Scan to PDF: capture photos via Camera or import from Gallery, apply document filters,
- * rotate/reorder pages, and save as a clean multi-page PDF.
+ * Scan to PDF: uses Google ML Kit Document Scanner (auto-scan, edge detection, perspective deskew,
+ * shadow removal) when available, with automatic fallback to built-in Camera2 and Gallery import.
  */
 class ScanActivity : Activity() {
 
@@ -42,6 +45,7 @@ class ScanActivity : Activity() {
     private val previews = HashMap<String, Bitmap>()
     private var selected = 0
     private var pendingPhotoFile: File? = null
+    private var pendingMlKitPdfUri: Uri? = null
 
     private fun dp(v: Number) = Ui.dp(this, v)
 
@@ -201,6 +205,32 @@ class ScanActivity : Activity() {
     private fun scanDir(): File = File(cacheDir, "scans").apply { mkdirs() }
 
     private fun takePhoto() {
+        val options = GmsDocumentScannerOptions.Builder()
+            .setGalleryImportAllowed(true)
+            .setPageLimit(50)
+            .setResultFormats(
+                GmsDocumentScannerOptions.RESULT_FORMAT_PDF,
+                GmsDocumentScannerOptions.RESULT_FORMAT_JPEG,
+            )
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+            .build()
+        try {
+            GmsDocumentScanning.getClient(options)
+                .getStartScanIntent(this)
+                .addOnSuccessListener { intentSender ->
+                    try {
+                        startIntentSenderForResult(intentSender, REQ_MLKIT, null, 0, 0, 0)
+                    } catch (_: Exception) {
+                        launchBuiltinCamera()
+                    }
+                }
+                .addOnFailureListener { launchBuiltinCamera() }
+        } catch (_: Throwable) {
+            launchBuiltinCamera()
+        }
+    }
+
+    private fun launchBuiltinCamera() {
         if (checkSelfPermission(android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.CAMERA), REQ_CAM_PERM)
             return
@@ -216,7 +246,7 @@ class ScanActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_CAM_PERM && grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            takePhoto()
+            launchBuiltinCamera()
         } else if (requestCode == REQ_CAM_PERM) {
             Toast.makeText(this, R.string.camera_permission_needed, Toast.LENGTH_SHORT).show()
         }
@@ -231,11 +261,12 @@ class ScanActivity : Activity() {
         }
     }
 
-    private fun startSave() {
-        if (pages.isEmpty()) {
+    private fun startSave(mlKitUri: Uri? = null) {
+        if (mlKitUri == null && pages.isEmpty()) {
             Toast.makeText(this, R.string.scan_empty, Toast.LENGTH_SHORT).show()
             return
         }
+        pendingMlKitPdfUri = mlKitUri
         val stamp = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.US).format(Date())
         val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
@@ -251,6 +282,36 @@ class ScanActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
         when (requestCode) {
+            REQ_MLKIT -> {
+                val res = GmsDocumentScanningResult.fromActivityResultIntent(data) ?: return
+                val pdfUri = res.pdf?.uri
+                if (pdfUri != null) {
+                    startSave(pdfUri)
+                    return
+                }
+                val mlPages = res.pages ?: return
+                progress.visibility = View.VISIBLE
+                io.execute {
+                    val added = ArrayList<PdfTools.ScanPage>()
+                    for (p in mlPages) {
+                        val dst = File(scanDir(), "mlkit_${System.currentTimeMillis()}_${added.size}.jpg")
+                        val copied = try {
+                            contentResolver.openInputStream(p.imageUri)?.use { ins ->
+                                FileOutputStream(dst).use { outs -> ins.copyTo(outs) }
+                            }
+                            dst.exists() && dst.length() > 0L
+                        } catch (_: Throwable) { false }
+                        if (copied) added += PdfTools.ScanPage(dst.path, 0, PdfTools.ScanFilter.ORIGINAL)
+                    }
+                    runOnUiThread {
+                        if (isFinishing) return@runOnUiThread
+                        progress.visibility = View.GONE
+                        pages += added
+                        if (pages.isNotEmpty()) selected = pages.lastIndex
+                        refresh()
+                    }
+                }
+            }
             REQ_CAMERA -> {
                 val f = pendingPhotoFile ?: return
                 if (!f.exists() || f.length() == 0L) {
@@ -298,14 +359,22 @@ class ScanActivity : Activity() {
             }
             REQ_SAVE -> {
                 val outUri = data?.data ?: return
+                val mlUri = pendingMlKitPdfUri
+                pendingMlKitPdfUri = null
                 val snapshot = pages.toList()
                 progress.visibility = View.VISIBLE
                 Toast.makeText(this, R.string.saving_pdf, Toast.LENGTH_SHORT).show()
                 io.execute {
                     val ok = try {
-                        contentResolver.openOutputStream(outUri)?.use { os ->
-                            PdfTools.imagesToPdf(snapshot, os)
-                        } ?: error("Cannot write")
+                        if (mlUri != null) {
+                            contentResolver.openInputStream(mlUri)?.use { ins ->
+                                contentResolver.openOutputStream(outUri)?.use { os -> ins.copyTo(os) }
+                            } ?: error("Cannot write")
+                        } else {
+                            contentResolver.openOutputStream(outUri)?.use { os ->
+                                PdfTools.imagesToPdf(snapshot, os)
+                            } ?: error("Cannot write")
+                        }
                         true
                     } catch (_: Throwable) { false }
                     runOnUiThread {
@@ -392,5 +461,6 @@ class ScanActivity : Activity() {
         private const val REQ_GALLERY = 72
         private const val REQ_SAVE = 73
         private const val REQ_CAM_PERM = 74
+        private const val REQ_MLKIT = 75
     }
 }
