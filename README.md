@@ -1,46 +1,39 @@
-# Sahl PDF · سهل PDF
+<div align="center">
 
-A calm, fast PDF reader for Android phones and TVs, part of the Sahl apps family.
+<img src="docs/banner.svg" alt="Sahl PDF · سهل PDF" width="100%"/>
 
-Sahl PDF 2 is a new app, written from scratch. It shares no code with earlier versions (those were built on MJ PDF; that code is kept only on the `legacy-mjpdf` tag). It's built step by step: each stage ships as a normal update.
+<br/><br/>
 
-## Features (stage 4: text & notes)
-- **Open** from the file picker, from "Open with…" or "Share" in any app, or from the **On this device** list (needs file access, which you're asked for only there).
-- **Send from phone** (on TV): open the local address and 6-digit code in any phone browser on the same Wi-Fi to send PDFs straight to `Download/Sahl PDF`.
-- **Recent** list with page thumbnails and reading progress. Each book reopens on the page where you stopped.
-- **Smooth reading**: continuous vertical scroll or horizontal page-by-page (left-to-right and right-to-left for Arabic books), **two-page spread**, fit width or fit whole page, fling, pinch and double-tap zoom, sharp text when zoomed in.
-- **Text selection & Xodo-style annotations**: long-press with drag handles to select text, copy, highlight (5 colors), underline, strikethrough, squiggly, or attach formatted Sahl notes; **Annotate bar** with Pen, freehand Highlighter (works on scanned and locked PDFs), Rect, Circle, Arrow, Free Text, Sticky Notes, Eraser, and **Save annotated PDF**.
-- **Links**: tap internal PDF links to jump pages or external links to open in your browser.
-- **Search** inside the document with match highlights and next/previous navigation.
-- **Bookmarks**: bookmark pages and jump back to them anytime.
-- **Crop margins**: automatically trim white page margins for comfortable reading.
-- **Contents** (the PDF's table of contents), **go to page**, a page slider and a page counter.
-- **Night pages** (inverted colours), keep the screen on, password-protected PDFs.
-- **Share / Open with** and document info.
-- **TV edition**: first-start TV defaults (two-page spread, whole page visible), **TV menu** on OK/Menu, ▲ ▼ scroll, ◀ ▶ previous/next spread (respects RTL), ⏪ ⏩ and channel +/− turn pages.
-- **In-app updates** from GitHub Releases, and the Sahl Union app strip in Settings.
-- Arabic and English, light and dark.
+[![Download APK](https://img.shields.io/github/v/release/AliSherif1309/SahlPDF?label=Download%20APK&color=0B5D4B&style=for-the-badge)](https://github.com/AliSherif1309/SahlPDF/releases/latest)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/AliSherif1309/SahlPDF/build.yml?label=Build&color=1E8A70&style=for-the-badge)](https://github.com/AliSherif1309/SahlPDF/actions)
+![Bilingual](https://img.shields.io/badge/Language-Arabic%20%26%20English-D4AF37?style=for-the-badge)
+![Privacy](https://img.shields.io/badge/Privacy-100%%20Offline-073D32?style=for-the-badge)
 
-## Coming next
-| Stage | Contents |
+</div>
+
+---
+
+## ✨ Highlights
+
+| Feature | What it gives you |
 |---|---|
-| 5. PDF tools | Organize pages, merge/split, document scanner |
+| 📄 **Smooth PDF Reading** | Fast page rendering, pinch-to-zoom, and jump-to-page for books and documents. |
+| 📖 **Comfortable Reading Modes** | Includes dark/night reading comfort and distraction-free full-screen view. |
+| 🔍 **Text & Document Tools** | Search inside documents, view outlines/bookmarks, and share pages easily. |
+| 🌙 **Sahl Family Design** | Clean Arabic & English interface with zero ads and zero tracking. |
 
-## Install
-Download from [Releases](../../releases/latest):
-- Most phones: `SahlPDF-arm64-v8a.apk`.
-- Mi TV and older 32-bit devices: `SahlPDF-armeabi-v7a.apk`.
-- Not sure: `SahlPDF.apk` (universal). Needs Android 8.0 or newer.
+---
 
-It uses the same app ID (`com.aly.sahlpdf`) and signing key as Sahl PDF 1.x, so it installs over it and updates in place. Old reading positions and bookmarks are not carried over.
+## 📲 Install in Seconds
 
-**TV:** to let the **On this device** list see your files, allow access once from a computer:
-```
-adb shell appops set com.aly.sahlpdf MANAGE_EXTERNAL_STORAGE allow
-```
+1. Tap **[Download Latest APK](https://github.com/AliSherif1309/SahlPDF/releases/latest)** above.
+2. Open the downloaded `.apk` file on your Android phone to install.
+3. **Sahl PDF** checks for new versions automatically so you stay up to date in one tap.
 
-## Build
-JDK 17, Android SDK 36 and Gradle 8.14: `gradle testDebugUnitTest assembleRelease`. CI (`.github/workflows/build.yml`) signs with the Sahl key from the repository secrets and publishes each `main` build as release `build-N`, plus a fixed `latest` release.
+---
 
-## Licence
-MIT, see [LICENSE](LICENSE). Third-party: PDFium (BSD-3-Clause) through PdfiumAndroidKt (Apache-2.0), and the Kotlin libraries (Apache-2.0).
+## 🌿 The Sahl Apps Family · عائلة تطبيقات سهل
+
+A calm, ad-free, bilingual (**Arabic & English**) suite of everyday Android apps crafted in **Emerald & Gold**:
+
+[🎨 Sahl Theme](https://github.com/AliSherif1309/SahlHome) · [🕌 Sahl Adhan](https://github.com/AliSherif1309/SahlAdhan) · [🧭 Sahl Qibla](https://github.com/AliSherif1309/SahlQibla) · [📞 Sahl Phone](https://github.com/AliSherif1309/SahlPhone) · [👤 Sahl Contacts](https://github.com/AliSherif1309/SahlContacts) · [💬 Sahl Messages](https://github.com/AliSherif1309/SahlMessages) · [📷 Sahl Camera](https://github.com/AliSherif1309/SahlCamera) · [🖼️ Sahl Gallery](https://github.com/AliSherif1309/SahlGallery) · [📁 Sahl Files](https://github.com/AliSherif1309/SahlFiles) · [🛠️ Sahl Tools](https://github.com/AliSherif1309/SahlTools) · [☁️ Sahl Sync](https://github.com/AliSherif1309/SahlSync) · [📺 Sahl TV](https://github.com/AliSherif1309/SahlTV-Launcher)
