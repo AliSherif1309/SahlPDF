@@ -208,6 +208,26 @@ class PdfDoc private constructor(
         return if (merged.isEmpty()) null else TextSelection(pageIdx, start, end, text, merged)
     }
 
+    fun textInRect(pageIdx: Int, bounds: NormRect): String = runCatching {
+        val p = page(pageIdx)
+        val tl = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (bounds.left * 10000f).toInt(), (bounds.top * 10000f).toInt())
+        val br = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (bounds.right * 10000f).toInt(), (bounds.bottom * 10000f).toInt())
+        p.openTextPage().use { tp ->
+            val total = tp.textPageCountChars()
+            if (total <= 0) return ""
+            val c1 = tp.textPageGetCharIndexAtPos(tl.x.toDouble(), tl.y.toDouble(), 24.0, 24.0)
+            val c2 = tp.textPageGetCharIndexAtPos(br.x.toDouble(), br.y.toDouble(), 24.0, 24.0)
+            val c3 = tp.textPageGetCharIndexAtPos(br.x.toDouble(), tl.y.toDouble(), 24.0, 24.0)
+            val c4 = tp.textPageGetCharIndexAtPos(tl.x.toDouble(), br.y.toDouble(), 24.0, 24.0)
+            val valid = listOf(c1, c2, c3, c4).filter { it in 0 until total }
+            if (valid.size >= 2) {
+                val s = valid.min()
+                val e = valid.max()
+                tp.textPageGetText(s, (e - s + 1).coerceAtMost(240))?.trim().orEmpty()
+            } else ""
+        }
+    }.getOrDefault("")
+
     fun toc(): List<TocItem> {
         val out = ArrayList<TocItem>()
         fun walk(list: List<PdfDocument.Bookmark>, depth: Int) {

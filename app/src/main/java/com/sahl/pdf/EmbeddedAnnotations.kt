@@ -19,6 +19,7 @@ data class EmbeddedAnnotation(
     val contents: String,
     val author: String,
     val bounds: NormRect,
+    val snippet: String = "",
 )
 
 /**
@@ -88,8 +89,6 @@ object EmbeddedAnnotations {
                         if (sub == "Link" || sub == "Widget" || sub == "Popup") continue
                         val contents = a.contents?.trim().orEmpty()
                         val author = (a as? PDAnnotationMarkup)?.titlePopup?.trim().orEmpty()
-                        // Include any annotation that has a note/comment, or is a Text/FreeText sticky note
-                        if (contents.isEmpty() && sub != "Text" && sub != "FreeText") continue
                         val rect = a.rectangle ?: continue
                         val norm = toNormRect(
                             rect.lowerLeftX, rect.lowerLeftY, rect.upperRightX, rect.upperRightY,
