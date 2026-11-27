@@ -58,6 +58,9 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private var name = ""
     private var size = -1L
     private var key = ""
+    private var docPassword: String? = null
+    private var embeddedAnnotations: List<EmbeddedAnnotation> = emptyList()
+    private var pendingEmbeddedEdit: ((java.io.OutputStream) -> Boolean)? = null
     private var barsShown = true
     private var searchOpen = false
     private var searchGen = 0
@@ -413,6 +416,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
     // ---- document ----------------------------------------------------------------------
 
     private fun open(password: String?) {
+        docPassword = password
         progress.visibility = View.VISIBLE
         renderer.call({ PdfDoc.open(this, uri, password) }) { r ->
             progress.visibility = View.GONE
@@ -438,6 +442,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         pdfView.setAnnotations(Library.annotations(this, key))
         pdfView.setInks(Library.inks(this, key))
         pdfView.setShapes(Library.shapes(this, key))
+        reloadEmbeddedAnnotations()
         updateLabel(start)
         Library.upsert(this, Book(key, uri.toString(), name, size, d.pageCount, start, System.currentTimeMillis()))
         val thumb = Library.thumb(this, key)
@@ -449,6 +454,19 @@ class ReaderActivity : Activity(), PdfView.Listener {
             }) { }
         }
         pdfView.postDelayed({ if (!isFinishing && !searchOpen && pdfView.zoom == 1f) setBars(false) }, 1800)
+    }
+
+    private fun reloadEmbeddedAnnotations() {
+        val targetUri = uri
+        val pwd = docPassword
+        Thread {
+            val loaded = try { EmbeddedAnnotations.load(this, targetUri, pwd) } catch (_: Throwable) { emptyList() }
+            runOnUiThread {
+                if (isFinishing || uri != targetUri) return@runOnUiThread
+                embeddedAnnotations = loaded
+                pdfView.setEmbeddedAnnotations(loaded)
+            }
+        }.start()
     }
 
     private fun askPassword(wrong: Boolean) {
@@ -715,8 +733,32 @@ class ReaderActivity : Activity(), PdfView.Listener {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != 44 || resultCode != RESULT_OK) return
+        if (resultCode != RESULT_OK) return
         val outUri = data?.data ?: return
+        if (requestCode == 45) {
+            val edit = pendingEmbeddedEdit ?: return
+            pendingEmbeddedEdit = null
+            progress.visibility = View.VISIBLE
+            Toast.makeText(this, R.string.saving_pdf, Toast.LENGTH_SHORT).show()
+            Thread {
+                val ok = try {
+                    contentResolver.openOutputStream(outUri)?.use { os -> edit(os) } ?: false
+                } catch (_: Throwable) { false }
+                runOnUiThread {
+                    if (isFinishing) return@runOnUiThread
+                    progress.visibility = View.GONE
+                    if (ok) {
+                        Toast.makeText(this, R.string.saved_pdf, Toast.LENGTH_SHORT).show()
+                        uri = outUri
+                        reopenAtCurrentPage()
+                    } else {
+                        Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }.start()
+            return
+        }
+        if (requestCode != 44) return
         val d = doc ?: return
         val anns = Library.annotations(this, key)
         val inks = Library.inks(this, key)
@@ -998,25 +1040,173 @@ class ReaderActivity : Activity(), PdfView.Listener {
     }
 
     private fun showAnnotations() {
-        val list = Library.annotations(this, key)
-        if (list.isEmpty()) {
+        data class NoteItem(val page: Int, val label: String, val embedded: EmbeddedAnnotation? = null)
+        val items = ArrayList<NoteItem>()
+        for (a in Library.annotations(this, key)) {
+            val pStr = getString(R.string.page_short, a.page + 1, pdfView.pageCount)
+            val body = (if (a.note.isNotBlank()) NoteFormat.decode(a.note).toString() else a.text).replace('\n', ' ').take(60)
+            items += NoteItem(a.page, "$pStr  ·  $body")
+        }
+        for (ea in embeddedAnnotations) {
+            val pStr = getString(R.string.page_short, ea.page + 1, pdfView.pageCount)
+            val body = ea.contents.ifBlank { ea.subtype }.replace('\n', ' ').take(60)
+            items += NoteItem(ea.page, "$pStr  ·  $body", ea)
+        }
+        if (items.isEmpty()) {
             Toast.makeText(this, R.string.no_notes, Toast.LENGTH_SHORT).show()
             return
         }
-        val labels = list.map { a ->
-            val pStr = getString(R.string.page_short, a.page + 1, pdfView.pageCount)
-            val body = (if (a.note.isNotBlank()) NoteFormat.decode(a.note).toString() else a.text).replace('\n', ' ').take(60)
-            "$pStr  ·  $body"
-        }.toTypedArray()
+        items.sortBy { it.page }
         AlertDialog.Builder(this)
             .setTitle(R.string.notes_title)
-            .setItems(labels) { _, which ->
-                val item = list[which]
+            .setItems(items.map { it.label }.toTypedArray()) { _, which ->
+                val item = items[which]
                 pdfView.goTo(item.page)
                 updateLabel(item.page)
+                item.embedded?.let { onEmbeddedAnnotationTap(it) }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    override fun onEmbeddedAnnotationTap(entry: EmbeddedAnnotation) {
+        val pal = Palette(this)
+        val dlg = android.app.Dialog(this)
+        dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = Ui.rounded(pal.bg, dp(22).toFloat(), dp(1), pal.divider)
+            setPadding(dp(20), dp(18), dp(20), dp(16))
+        }
+        val titleParts = ArrayList<String>()
+        titleParts += getString(R.string.note)
+        titleParts += getString(R.string.page_short, entry.page + 1, pdfView.pageCount)
+        if (entry.author.isNotBlank()) titleParts += entry.author
+        card.addView(TextView(this).apply {
+            text = titleParts.joinToString(" · ")
+            textSize = 15.5f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(pal.gold)
+            setPadding(0, 0, 0, dp(10))
+        })
+
+        val bodyBox = android.widget.ScrollView(this).apply {
+            background = Ui.rounded(pal.card, dp(16).toFloat(), dp(1), pal.divider)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            addView(TextView(this@ReaderActivity).apply {
+                text = entry.contents.ifBlank { entry.subtype }
+                textSize = 16.5f
+                setTextColor(pal.text)
+                setTextIsSelectable(true)
+                setLineSpacing(dp(4).toFloat(), 1f)
+            })
+        }
+        card.addView(bodyBox, LinearLayout.LayoutParams(-1, -2).apply {
+            bottomMargin = dp(14)
+        })
+
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+        }
+        fun btn(labelRes: Int, bg: Int, fg: Int, click: () -> Unit) = TextView(this).apply {
+            text = getString(labelRes)
+            setTextColor(fg); textSize = 13.5f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            Ui.focusable(this, bg, dp(14).toFloat(), pal.gold)
+            setOnClickListener { click() }
+        }
+        if (entry.contents.isNotBlank()) {
+            actions.addView(btn(R.string.copy, pal.card, pal.text) {
+                val cm = getSystemService(android.content.ClipboardManager::class.java)
+                cm?.setPrimaryClip(android.content.ClipData.newPlainText("Note", entry.contents))
+                Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
+            }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        }
+        actions.addView(btn(R.string.edit_note, pal.card, pal.text) {
+            dlg.dismiss()
+            showNoteEditor(R.string.edit_note, "", entry.contents) { html ->
+                val plain = NoteFormat.decode(html).toString().trim()
+                applyEmbeddedEdit { os ->
+                    EmbeddedAnnotations.updateContents(this, uri, docPassword, entry.page, entry.indexOnPage, plain, os)
+                }
+            }
+        }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        actions.addView(btn(R.string.delete, Color.parseColor("#B83B3B"), Color.WHITE) {
+            dlg.dismiss()
+            applyEmbeddedEdit { os ->
+                EmbeddedAnnotations.deleteAnnotation(this, uri, docPassword, entry.page, entry.indexOnPage, os)
+            }
+        }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        actions.addView(btn(android.R.string.ok, pal.accent, Color.WHITE) { dlg.dismiss() })
+        card.addView(actions)
+
+        dlg.setContentView(card)
+        dlg.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dlg.window?.setLayout((resources.displayMetrics.widthPixels * 0.92f).toInt(), -2)
+        dlg.show()
+    }
+
+    private fun applyEmbeddedEdit(edit: (java.io.OutputStream) -> Boolean) {
+        progress.visibility = View.VISIBLE
+        val tmp = java.io.File(cacheDir, "edit_${System.currentTimeMillis()}.pdf")
+        Thread {
+            val wroteTmp = try {
+                FileOutputStream(tmp).use { os -> edit(os) } && tmp.exists() && tmp.length() > 0L
+            } catch (_: Throwable) { false }
+            val wroteInPlace = if (wroteTmp) {
+                try {
+                    contentResolver.openOutputStream(uri, "wt")?.use { out ->
+                        tmp.inputStream().use { ins -> ins.copyTo(out) }
+                    } != null
+                } catch (_: Throwable) { false }
+            } else false
+            tmp.delete()
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                progress.visibility = View.GONE
+                if (wroteInPlace) {
+                    Toast.makeText(this, R.string.saved_pdf, Toast.LENGTH_SHORT).show()
+                    reopenAtCurrentPage()
+                } else if (wroteTmp) {
+                    // Original URI is read-only; ask user where to save updated copy
+                    pendingEmbeddedEdit = edit
+                    val base = name.removeSuffix(".pdf").removeSuffix(".PDF")
+                    val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("application/pdf")
+                        .putExtra(Intent.EXTRA_TITLE, "$base-edited.pdf")
+                    try { startActivityForResult(i, 45) } catch (_: Exception) {
+                        Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun reopenAtCurrentPage() {
+        val curPage = pdfView.page
+        val old = doc
+        doc = null
+        progress.visibility = View.VISIBLE
+        renderer.call({
+            old?.close()
+            PdfDoc.open(this, uri, docPassword)
+        }) { r ->
+            progress.visibility = View.GONE
+            r.onSuccess { d ->
+                doc = d
+                val p = curPage.coerceIn(0, d.pageCount - 1)
+                seek.max = d.pageCount - 1
+                pdfView.setDocument(d, p)
+                reloadEmbeddedAnnotations()
+                updateLabel(p)
+            }
+            r.onFailure { Toast.makeText(this, R.string.cannot_open, Toast.LENGTH_SHORT).show() }
+        }
     }
 
     private fun startSafely(i: Intent) {

@@ -48,6 +48,7 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         fun onShapeTap(entry: Library.ShapeEntry)
         fun onAnnotationMoved(id: String, rects: List<NormRect>)
         fun onShapeMoved(id: String, x1: Float, y1: Float, x2: Float, y2: Float)
+        fun onEmbeddedAnnotationTap(entry: EmbeddedAnnotation)
     }
 
     var listener: Listener? = null
@@ -193,6 +194,12 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
     fun setInks(list: List<Library.InkStroke>) {
         inks = list
         invalidate()
+    }
+
+    private var embeddedAnnotations: List<EmbeddedAnnotation> = emptyList()
+
+    fun setEmbeddedAnnotations(list: List<EmbeddedAnnotation>) {
+        embeddedAnnotations = list
     }
 
     fun setShapes(list: List<Library.ShapeEntry>) {
@@ -677,6 +684,11 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
                 }
                 if (shapeHit != null) {
                     listener?.onShapeTap(shapeHit)
+                    return true
+                }
+                val embHit = embeddedAnnotations.firstOrNull { ea -> ea.page == p && hitNorm(nx, ny, ea.bounds, 0.025f) }
+                if (embHit != null) {
+                    listener?.onEmbeddedAnnotationTap(embHit)
                     return true
                 }
                 val d = doc

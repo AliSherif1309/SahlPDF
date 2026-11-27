@@ -140,4 +140,5 @@
     <string name="exported_count">Saved %1$d files</string>
     <string name="capture_photo">Capture</string>
     <string name="camera_permission_needed">Camera permission is needed to scan documents</string>
+    <string name="note">Note</string>
 </resources>

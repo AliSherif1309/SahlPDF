@@ -77,6 +77,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     // Optional Google Play Services ML Kit Document Scanner (~300KB client; falls back gracefully if Play Services is absent).
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
+    // Apache-2.0 PDFBox-Android for reading & editing native embedded PDF annotations (Xodo, Adobe, etc.).
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     testImplementation("junit:junit:4.13.2")
 }
