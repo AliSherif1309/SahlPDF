@@ -27,36 +27,47 @@ object ScannedTextDetector {
         }
 
         // 1. Strip long continuous vertical table/box borders
+        val orig = dark.copyOf()
         val minVertLine = max(14, (h * 0.045f).toInt())
         for (x in 0 until w) {
             var y = 0
             while (y < h) {
-                if (!dark[y * w + x]) {
+                if (!orig[y * w + x]) {
                     y++
                     continue
                 }
                 val start = y
-                while (y < h && dark[y * w + x]) y++
+                while (y < h && orig[y * w + x]) y++
                 if (y - start >= minVertLine) {
                     for (cy in start until y) dark[cy * w + x] = false
                 }
             }
         }
 
-        // 2. Strip long continuous horizontal table/divider lines
-        val minHorizLine = max(36, (w * 0.20f).toInt())
+        // 2. Strip long, thin continuous horizontal table/divider lines
+        val minHorizLine = max(40, (w * 0.20f).toInt())
+        val maxHorizThick = max(4, h / 120)
         for (y in 0 until h) {
             val rowOff = y * w
             var x = 0
             while (x < w) {
-                if (!dark[rowOff + x]) {
+                if (!orig[rowOff + x]) {
                     x++
                     continue
                 }
                 val start = x
-                while (x < w && dark[rowOff + x]) x++
-                if (x - start >= minHorizLine) {
-                    for (cx in start until x) dark[rowOff + cx] = false
+                while (x < w && orig[rowOff + x]) x++
+                val len = x - start
+                if (len >= minHorizLine) {
+                    // Verify it is a thin rule, not a thick text block or graphic
+                    val midX = (start + x) / 2
+                    var up = y
+                    while (up > 0 && y - up <= maxHorizThick && orig[(up - 1) * w + midX]) up--
+                    var dn = y
+                    while (dn + 1 < h && dn - y <= maxHorizThick && orig[(dn + 1) * w + midX]) dn++
+                    if (dn - up + 1 <= maxHorizThick) {
+                        for (cx in start until x) dark[rowOff + cx] = false
+                    }
                 }
             }
         }
