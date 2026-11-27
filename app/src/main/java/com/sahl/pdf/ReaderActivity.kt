@@ -461,10 +461,30 @@ class ReaderActivity : Activity(), PdfView.Listener {
         val pwd = docPassword
         Thread {
             val loaded = try { EmbeddedAnnotations.load(this, targetUri, pwd) } catch (_: Throwable) { emptyList() }
-            runOnUiThread {
-                if (isFinishing || uri != targetUri) return@runOnUiThread
-                embeddedAnnotations = loaded
-                pdfView.setEmbeddedAnnotations(loaded)
+            val textSubtypes = setOf("Highlight", "Underline", "StrikeOut", "Squiggly")
+            val needSnippet = loaded.withIndex().filter { (_, ea) -> ea.contents.isBlank() && ea.subtype in textSubtypes }.take(250)
+            val d = doc
+            if (d != null && needSnippet.isNotEmpty()) {
+                renderer.call({
+                    loaded.mapIndexed { idx, ea ->
+                        if (ea.contents.isBlank() && ea.subtype in textSubtypes && needSnippet.any { it.index == idx }) {
+                            val snip = d.textInRect(ea.page, ea.bounds)
+                            if (snip.isNotBlank()) ea.copy(snippet = snip) else ea
+                        } else ea
+                    }
+                }) { r ->
+                    val enriched = r.getOrDefault(loaded)
+                    if (!isFinishing && uri == targetUri) {
+                        embeddedAnnotations = enriched
+                        pdfView.setEmbeddedAnnotations(enriched)
+                    }
+                }
+            } else {
+                runOnUiThread {
+                    if (isFinishing || uri != targetUri) return@runOnUiThread
+                    embeddedAnnotations = loaded
+                    pdfView.setEmbeddedAnnotations(loaded)
+                }
             }
         }.start()
     }
@@ -1049,7 +1069,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
         for (ea in embeddedAnnotations) {
             val pStr = getString(R.string.page_short, ea.page + 1, pdfView.pageCount)
-            val body = ea.contents.ifBlank { ea.subtype }.replace('\n', ' ').take(60)
+            val body = ea.contents.ifBlank { ea.snippet }.ifBlank { ea.subtype }.replace('\n', ' ').take(60)
             items += NoteItem(ea.page, "$pStr  ·  $body", ea)
         }
         if (items.isEmpty()) {
@@ -1091,11 +1111,12 @@ class ReaderActivity : Activity(), PdfView.Listener {
             setPadding(0, 0, 0, dp(10))
         })
 
+        val displayBody = entry.contents.ifBlank { entry.snippet }.ifBlank { entry.subtype }
         val bodyBox = android.widget.ScrollView(this).apply {
             background = Ui.rounded(pal.card, dp(16).toFloat(), dp(1), pal.divider)
             setPadding(dp(14), dp(12), dp(14), dp(12))
             addView(TextView(this@ReaderActivity).apply {
-                text = entry.contents.ifBlank { entry.subtype }
+                text = displayBody
                 textSize = 16.5f
                 setTextColor(pal.text)
                 setTextIsSelectable(true)
@@ -1117,10 +1138,11 @@ class ReaderActivity : Activity(), PdfView.Listener {
             Ui.focusable(this, bg, dp(14).toFloat(), pal.gold)
             setOnClickListener { click() }
         }
-        if (entry.contents.isNotBlank()) {
+        val copyText = entry.contents.ifBlank { entry.snippet }
+        if (copyText.isNotBlank()) {
             actions.addView(btn(R.string.copy, pal.card, pal.text) {
                 val cm = getSystemService(android.content.ClipboardManager::class.java)
-                cm?.setPrimaryClip(android.content.ClipData.newPlainText("Note", entry.contents))
+                cm?.setPrimaryClip(android.content.ClipData.newPlainText("Note", copyText))
                 Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
             }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
         }
