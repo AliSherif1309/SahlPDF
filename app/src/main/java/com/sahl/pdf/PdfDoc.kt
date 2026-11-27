@@ -50,6 +50,10 @@ class PdfDoc private constructor(
         }
     }
 
+    private val scannedWordsCache = object : LinkedHashMap<Int, List<NormRect>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, List<NormRect>>) = size > 8
+    }
+
     private fun page(i: Int): PdfPage = openPages.getOrPut(i) { pdf.openPage(i) }
 
     /** Renders page [i] scaled to [drawW]x[drawH], shifted by ([startX], [startY]), into [bmp]. */
@@ -133,20 +137,39 @@ class PdfDoc private constructor(
         return out
     }
 
+    private fun scannedWords(pageIdx: Int): List<NormRect> {
+        scannedWordsCache[pageIdx]?.let { return it }
+        val bmp = renderThumb(pageIdx, 900)
+        val words = try {
+            val w = bmp.width; val h = bmp.height
+            val pixels = IntArray(w * h)
+            bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+            ScannedTextDetector.detectWords(pixels, w, h)
+        } finally {
+            bmp.recycle()
+        }
+        scannedWordsCache[pageIdx] = words
+        return words
+    }
+
     fun selectWordAt(pageIdx: Int, nx: Float, ny: Float): TextSelection? = runCatching {
         val p = page(pageIdx)
         val pt = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (nx * 10000f).toInt(), (ny * 10000f).toInt())
         p.openTextPage().use { tp ->
             val total = tp.textPageCountChars()
-            if (total <= 0) return null
-            val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 16.0, 16.0)
-            if (idx !in 0 until total) return null
-            var start = idx
-            var end = idx
-            while (start > 0 && !tp.textPageGetUnicode(start - 1).isWhitespace()) start--
-            while (end + 1 < total && !tp.textPageGetUnicode(end + 1).isWhitespace()) end++
-            buildSelection(p, tp, pageIdx, start, end)
+            if (total > 0) {
+                val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 16.0, 16.0)
+                if (idx !in 0 until total) return null
+                var start = idx
+                var end = idx
+                while (start > 0 && !tp.textPageGetUnicode(start - 1).isWhitespace()) start--
+                while (end + 1 < total && !tp.textPageGetUnicode(end + 1).isWhitespace()) end++
+                return buildSelection(p, tp, pageIdx, start, end)
+            }
         }
+        val words = scannedWords(pageIdx)
+        val idx = ScannedTextDetector.nearestWordIndex(words, nx, ny)
+        if (idx !in words.indices) null else TextSelection(pageIdx, idx, idx, "", listOf(words[idx]))
     }.getOrNull()
 
     fun selectRange(pageIdx: Int, anchorChar: Int, nx: Float, ny: Float): TextSelection? = runCatching {
@@ -154,12 +177,20 @@ class PdfDoc private constructor(
         val pt = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (nx * 10000f).toInt(), (ny * 10000f).toInt())
         p.openTextPage().use { tp ->
             val total = tp.textPageCountChars()
-            if (total <= 0) return null
-            val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 24.0, 24.0)
-            if (idx !in 0 until total) return null
-            val a = anchorChar.coerceIn(0, total - 1)
-            buildSelection(p, tp, pageIdx, minOf(a, idx), maxOf(a, idx))
+            if (total > 0) {
+                val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 24.0, 24.0)
+                if (idx !in 0 until total) return null
+                val a = anchorChar.coerceIn(0, total - 1)
+                return buildSelection(p, tp, pageIdx, minOf(a, idx), maxOf(a, idx))
+            }
         }
+        val words = scannedWords(pageIdx)
+        val idx = ScannedTextDetector.nearestWordIndex(words, nx, ny)
+        if (idx !in words.indices) return null
+        val a = anchorChar.coerceIn(0, words.lastIndex)
+        val s = minOf(a, idx); val e = maxOf(a, idx)
+        val merged = NoteFormat.mergeLineRects(words.subList(s, e + 1))
+        if (merged.isEmpty()) null else TextSelection(pageIdx, s, e, "", merged)
     }.getOrNull()
 
     fun selectBetween(
@@ -174,13 +205,22 @@ class PdfDoc private constructor(
         val pt = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (nx * 10000f).toInt(), (ny * 10000f).toInt())
         p.openTextPage().use { tp ->
             val total = tp.textPageCountChars()
-            if (total <= 0) return null
-            val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 28.0, 28.0)
-            if (idx !in 0 until total) return null
-            val s = (if (moveStart) idx else startChar).coerceIn(0, total - 1)
-            val e = (if (moveStart) endChar else idx).coerceIn(0, total - 1)
-            buildSelection(p, tp, pageIdx, minOf(s, e), maxOf(s, e))
+            if (total > 0) {
+                val idx = tp.textPageGetCharIndexAtPos(pt.x.toDouble(), pt.y.toDouble(), 28.0, 28.0)
+                if (idx !in 0 until total) return null
+                val s = (if (moveStart) idx else startChar).coerceIn(0, total - 1)
+                val e = (if (moveStart) endChar else idx).coerceIn(0, total - 1)
+                return buildSelection(p, tp, pageIdx, minOf(s, e), maxOf(s, e))
+            }
         }
+        val words = scannedWords(pageIdx)
+        val idx = ScannedTextDetector.nearestWordIndex(words, nx, ny)
+        if (idx !in words.indices) return null
+        val s = (if (moveStart) idx else startChar).coerceIn(0, words.lastIndex)
+        val e = (if (moveStart) endChar else idx).coerceIn(0, words.lastIndex)
+        val lo = minOf(s, e); val hi = maxOf(s, e)
+        val merged = NoteFormat.mergeLineRects(words.subList(lo, hi + 1))
+        if (merged.isEmpty()) null else TextSelection(pageIdx, lo, hi, "", merged)
     }.getOrNull()
 
     private fun buildSelection(
