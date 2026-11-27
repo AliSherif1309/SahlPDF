@@ -135,4 +135,73 @@ object ScannedTextDetector {
         }
         return if (bestDist <= 0.04f) best else -1
     }
+
+    /**
+     * Builds smooth, Xodo-style line-snapped highlight bands between ([x1],[y1]) and ([x2],[y2])
+     * using visually detected [words]. Always returns at least one clean band even on faint scans.
+     */
+    fun detectLineBands(
+        words: List<NormRect>,
+        x1: Float,
+        y1: Float,
+        x2: Float,
+        y2: Float,
+        rtl: Boolean = false,
+    ): List<NormRect> {
+        val topY = minOf(y1, y2)
+        val botY = maxOf(y1, y2)
+        val sx = if (y1 <= y2) x1 else x2
+        val ex = if (y1 <= y2) x2 else x1
+
+        // Group words into horizontal lines
+        data class Line(var left: Float, var top: Float, var right: Float, var bottom: Float)
+        val lines = ArrayList<Line>()
+        for (w in words.sortedBy { it.top }) {
+            val prev = lines.lastOrNull()
+            if (prev != null && w.top <= prev.bottom + (prev.bottom - prev.top) * 0.25f) {
+                prev.left = minOf(prev.left, w.left)
+                prev.top = minOf(prev.top, w.top)
+                prev.right = maxOf(prev.right, w.right)
+                prev.bottom = maxOf(prev.bottom, w.bottom)
+            } else {
+                lines += Line(w.left, w.top, w.right, w.bottom)
+            }
+        }
+
+        val hit = lines.filter { ln ->
+            val pad = (ln.bottom - ln.top) * 0.35f
+            ln.bottom + pad >= topY && ln.top - pad <= botY
+        }
+
+        if (hit.isEmpty()) {
+            val l = minOf(x1, x2).coerceIn(0f, 1f)
+            val r = maxOf(x1, x2).coerceIn(0f, 1f)
+            val hPad = 0.011f
+            val t = (topY - hPad).coerceIn(0f, 1f)
+            val b = (botY + hPad).coerceIn(0f, 1f)
+            return if (r - l >= 0.005f) listOf(NormRect(l, t, r, b)) else emptyList()
+        }
+
+        if (hit.size == 1) {
+            val ln = hit[0]
+            val l = minOf(x1, x2).coerceIn(ln.left, ln.right)
+            val r = maxOf(x1, x2).coerceIn(ln.left, ln.right)
+            return if (r - l >= 0.005f) listOf(NormRect(l, ln.top, r, ln.bottom))
+            else listOf(NormRect(ln.left, ln.top, ln.right, ln.bottom))
+        }
+
+        val isRtl = rtl || sx > 0.55f
+        val out = ArrayList<NormRect>(hit.size)
+        for ((idx, ln) in hit.withIndex()) {
+            val (l, r) = when (idx) {
+                0 -> if (isRtl) ln.left to sx.coerceIn(ln.left + 0.01f, ln.right)
+                else sx.coerceIn(ln.left, ln.right - 0.01f) to ln.right
+                hit.lastIndex -> if (isRtl) ex.coerceIn(ln.left, ln.right - 0.01f) to ln.right
+                else ln.left to ex.coerceIn(ln.left + 0.01f, ln.right)
+                else -> ln.left to ln.right
+            }
+            if (r > l) out += NormRect(l, ln.top, r, ln.bottom)
+        }
+        return out
+    }
 }

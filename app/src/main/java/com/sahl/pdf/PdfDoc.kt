@@ -223,6 +223,30 @@ class PdfDoc private constructor(
         if (merged.isEmpty()) null else TextSelection(pageIdx, lo, hi, "", merged)
     }.getOrNull()
 
+    /**
+     * Direct 1-finger drag highlight from ([x1],[y1]) to ([x2],[y2]):
+     * uses exact PDFium text selection when a text layer exists, and smooth line-snapped
+     * bands via [ScannedTextDetector.detectLineBands] on scanned pages.
+     */
+    fun highlightDrag(pageIdx: Int, x1: Float, y1: Float, x2: Float, y2: Float, rtl: Boolean = false): TextSelection? = runCatching {
+        val p = page(pageIdx)
+        p.openTextPage().use { tp ->
+            val total = tp.textPageCountChars()
+            if (total > 0) {
+                val pt1 = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (x1 * 10000f).toInt(), (y1 * 10000f).toInt())
+                val pt2 = p.mapDeviceCoordsToPage(0, 0, 10000, 10000, 0, (x2 * 10000f).toInt(), (y2 * 10000f).toInt())
+                val c1 = tp.textPageGetCharIndexAtPos(pt1.x.toDouble(), pt1.y.toDouble(), 24.0, 24.0)
+                val c2 = tp.textPageGetCharIndexAtPos(pt2.x.toDouble(), pt2.y.toDouble(), 24.0, 24.0)
+                if (c1 in 0 until total && c2 in 0 until total) {
+                    return buildSelection(p, tp, pageIdx, minOf(c1, c2), maxOf(c1, c2))
+                }
+            }
+        }
+        val words = scannedWords(pageIdx)
+        val bands = ScannedTextDetector.detectLineBands(words, x1, y1, x2, y2, rtl)
+        if (bands.isEmpty()) null else TextSelection(pageIdx, 0, 0, "", bands)
+    }.getOrNull()
+
     private fun buildSelection(
         p: PdfPage,
         tp: io.legere.pdfiumandroid.PdfTextPage,

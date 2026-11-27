@@ -31,5 +31,9 @@ class ScannedTextDetectorTest {
 
         val hit = ScannedTextDetector.nearestWordIndex(words, 0.5f, 0.25f)
         assertEquals(1, hit)
+
+        val bands = ScannedTextDetector.detectLineBands(words, 0.7f, 0.25f, 0.3f, 0.60f, rtl = true)
+        assertEquals(2, bands.size)
+        assertTrue(bands[0].top < bands[1].top)
     }
 }

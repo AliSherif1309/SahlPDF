@@ -31,7 +31,7 @@ import kotlin.math.roundToInt
 @SuppressLint("ViewConstructor")
 class PdfView(context: Context, private val renderer: Renderer) : View(context) {
 
-    enum class ToolMode { NONE, PEN, MARKER, RECT, CIRCLE, ARROW, TEXT, ERASER, STICKY }
+    enum class ToolMode { NONE, HIGHLIGHT, PEN, MARKER, RECT, CIRCLE, ARROW, TEXT, ERASER, STICKY }
 
     interface Listener {
         fun onPageChanged(page: Int, count: Int)
@@ -49,6 +49,7 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         fun onAnnotationMoved(id: String, rects: List<NormRect>)
         fun onShapeMoved(id: String, x1: Float, y1: Float, x2: Float, y2: Float)
         fun onEmbeddedAnnotationTap(entry: EmbeddedAnnotation)
+        fun onHighlightDragged(page: Int, text: String, rects: List<NormRect>)
     }
 
     var listener: Listener? = null
@@ -396,13 +397,20 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
         requestRenders(visiblePages)
     }
 
+    private var hlDragPage = -1
+    private var hlX1 = 0f; private var hlY1 = 0f; private var hlX2 = 0f; private var hlY2 = 0f
+    private var hlPreviewRects: List<NormRect> = emptyList()
+
     private fun drawHighlights(canvas: Canvas, pageIdx: Int, pageDst: RectF) {
         val crop = cropFor(pageIdx)
-        overlay.drawPageOverlays(canvas, pageIdx, pageDst, crop, annotations, inks, shapes)
+        overlay.drawPageOverlays(canvas, pageIdx, pageDst, crop, annotations, inks, shapes, night = night)
+        if (hlDragPage == pageIdx && hlPreviewRects.isNotEmpty()) {
+            overlay.drawNormRects(canvas, pageDst, crop, hlPreviewRects, penColor, night = night)
+        }
         if (activeInkPage == pageIdx && activeInkPts.isNotEmpty()) {
             val c = if (toolMode == ToolMode.MARKER) (penColor and 0x00FFFFFF) or 0x55000000 else penColor
             val w = if (toolMode == ToolMode.MARKER) penWidth * 3.2f else penWidth
-            overlay.drawInk(canvas, pageDst, crop, c, w, activeInkPts)
+            overlay.drawInk(canvas, pageDst, crop, c, w, activeInkPts, night = night)
         }
         if (activeShapePage == pageIdx) {
             val kind = when (toolMode) {
@@ -417,12 +425,12 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
             val hit = searchHits[idx]
             if (hit.page == pageIdx) {
                 val c = if (idx == activeHitIndex) activeHitPaint.color else hitPaint.color
-                overlay.drawNormRects(canvas, pageDst, crop, hit.rects, c)
+                overlay.drawNormRects(canvas, pageDst, crop, hit.rects, c, night = night)
             }
         }
         val sel = selection
         if (sel != null && sel.page == pageIdx && sel.rects.isNotEmpty()) {
-            overlay.drawNormRects(canvas, pageDst, crop, sel.rects, selPaint.color)
+            overlay.drawNormRects(canvas, pageDst, crop, sel.rects, selPaint.color, night = night)
             val crop = cropFor(pageIdx)
             val cw = max(0.05f, crop.width)
             val ch = max(0.05f, crop.height)
@@ -753,7 +761,66 @@ class PdfView(context: Context, private val renderer: Renderer) : View(context) 
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (toolMode == ToolMode.PEN || toolMode == ToolMode.MARKER) {
+        if (toolMode == ToolMode.HIGHLIGHT) {
+            if (event.pointerCount == 1) {
+                val d = doc
+                val rtl = flowMode == FlowMode.HORIZONTAL_RTL
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        val hit = hitTestPage(event.x, event.y)
+                        if (hit != null && d != null) {
+                            stopMotion()
+                            hlDragPage = hit.first
+                            hlX1 = hit.second; hlY1 = hit.third
+                            hlX2 = hit.second; hlY2 = hit.third
+                            hlPreviewRects = emptyList()
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_MOVE -> if (hlDragPage >= 0 && d != null) {
+                        val hit = hitTestPage(event.x, event.y)
+                        if (hit != null && hit.first == hlDragPage) {
+                            hlX2 = hit.second; hlY2 = hit.third
+                            if (!selInFlight) {
+                                selInFlight = true
+                                val p = hlDragPage; val x1 = hlX1; val y1 = hlY1; val x2 = hlX2; val y2 = hlY2
+                                val gen = ++selGen
+                                renderer.call({ d.highlightDrag(p, x1, y1, x2, y2, rtl) }) { r ->
+                                    selInFlight = false
+                                    if (gen == selGen && doc === d && hlDragPage == p) {
+                                        hlPreviewRects = r.getOrNull()?.rects ?: emptyList()
+                                        invalidate()
+                                    }
+                                }
+                            }
+                        }
+                        return true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (hlDragPage >= 0 && d != null) {
+                        val p = hlDragPage; val x1 = hlX1; val y1 = hlY1; val x2 = hlX2; val y2 = hlY2
+                        hlDragPage = -1
+                        hlPreviewRects = emptyList()
+                        invalidate()
+                        if (kotlin.math.hypot((x2 - x1).toDouble(), (y2 - y1).toDouble()) < 0.008) {
+                            // Short tap while in highlight mode: check if tapping an existing annotation
+                            val ann = annotations.firstOrNull { a -> a.page == p && a.rects.any { hitNorm(x1, y1, it) } }
+                            if (ann != null) listener?.onAnnotationTap(ann)
+                            return true
+                        }
+                        renderer.call({ d.highlightDrag(p, x1, y1, x2, y2, rtl) }) { r ->
+                            val sel = r.getOrNull()
+                            if (doc === d && sel != null && sel.rects.isNotEmpty()) {
+                                listener?.onHighlightDragged(p, sel.text, sel.rects)
+                            }
+                        }
+                        return true
+                    }
+                }
+            } else {
+                hlDragPage = -1
+                hlPreviewRects = emptyList()
+            }
+        } else if (toolMode == ToolMode.PEN || toolMode == ToolMode.MARKER) {
             if (event.pointerCount == 1) {
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
