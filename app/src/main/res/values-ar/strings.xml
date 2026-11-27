@@ -141,4 +141,9 @@
     <string name="capture_photo">التقاط</string>
     <string name="camera_permission_needed">يلزم إذن الكاميرا لمسح المستندات ضوئياً</string>
     <string name="note">ملاحظة</string>
+    <string name="jump_back">الموضع السابق</string>
+    <string name="jump_forward">الموضع التالي</string>
+    <string name="prev_page">الصفحة السابقة</string>
+    <string name="next_page">الصفحة التالية</string>
+    <string name="drag_to_highlight">اسحب فوق النص للتظليل</string>
 </resources>

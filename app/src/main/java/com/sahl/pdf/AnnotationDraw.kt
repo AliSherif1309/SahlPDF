@@ -1,11 +1,15 @@
 package com.sahl.pdf
 
+import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Build
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
@@ -18,9 +22,18 @@ import kotlin.math.sin
  */
 class AnnotationDraw(private val unit: Float) {
     private val annPaint = Paint()
+    private val hlPaint = Paint().apply {
+        if (Build.VERSION.SDK_INT >= 29) blendMode = BlendMode.MULTIPLY
+        else xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
+    }
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+    }
+    private val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+        if (Build.VERSION.SDK_INT >= 29) blendMode = BlendMode.MULTIPLY
+        else xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.DEFAULT_BOLD }
     private val noteDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF5C84C.toInt() }
@@ -34,6 +47,7 @@ class AnnotationDraw(private val unit: Float) {
         color: Int,
         dot: Boolean = false,
         style: String = "highlight",
+        night: Boolean = false,
     ) {
         val cw = max(0.05f, crop.width)
         val ch = max(0.05f, crop.height)
@@ -85,21 +99,33 @@ class AnnotationDraw(private val unit: Float) {
                     canvas.drawLine(l + 4f * unit, t + 14f * unit, l + sz - 7f * unit, t + 14f * unit, linePaint)
                 }
                 else -> {
-                    annPaint.color = color
-                    canvas.drawRect(l, t, r, b, annPaint)
+                    if (night) {
+                        annPaint.color = (color and 0x00FFFFFF) or 0x66000000
+                        canvas.drawRect(l, t, r, b, annPaint)
+                    } else {
+                        hlPaint.color = color or 0xFF000000.toInt()
+                        canvas.drawRect(l, t, r, b, hlPaint)
+                    }
                 }
             }
             if (dot && idx == 0 && style != "sticky") canvas.drawCircle(r, t, 4 * unit, noteDotPaint)
         }
     }
 
-    fun drawInk(canvas: Canvas, pageDst: RectF, crop: NormRect, color: Int, normW: Float, pts: List<Float>) {
+    fun drawInk(canvas: Canvas, pageDst: RectF, crop: NormRect, color: Int, normW: Float, pts: List<Float>, night: Boolean = false) {
         if (pts.size < 2) return
         val cw = max(0.05f, crop.width)
         val ch = max(0.05f, crop.height)
         val fullW = pageDst.width() / cw
-        inkPaint.color = color
-        inkPaint.strokeWidth = max(1.5f, normW * fullW)
+        val isMarker = Color.alpha(color) < 220
+        val p = if (isMarker && !night) {
+            markerPaint.color = color or 0xFF000000.toInt()
+            markerPaint
+        } else {
+            inkPaint.color = color
+            inkPaint
+        }
+        p.strokeWidth = max(1.5f, normW * fullW)
         path.reset()
         for (k in 0 until pts.size - 1 step 2) {
             val sx = pageDst.left + ((pts[k] - crop.left) / cw) * pageDst.width()
@@ -109,8 +135,8 @@ class AnnotationDraw(private val unit: Float) {
         if (pts.size == 2) canvas.drawPoint(
             pageDst.left + ((pts[0] - crop.left) / cw) * pageDst.width(),
             pageDst.top + ((pts[1] - crop.top) / ch) * pageDst.height(),
-            inkPaint,
-        ) else canvas.drawPath(path, inkPaint)
+            p,
+        ) else canvas.drawPath(path, p)
     }
 
     fun drawShape(
@@ -167,12 +193,13 @@ class AnnotationDraw(private val unit: Float) {
         annotations: List<Library.AnnotationEntry>,
         inks: List<Library.InkStroke>,
         shapes: List<Library.ShapeEntry>,
+        night: Boolean = false,
     ) {
         for (a in annotations) {
-            if (a.page == pageIdx) drawNormRects(canvas, pageDst, crop, a.rects, a.color, dot = a.note.isNotBlank(), style = a.style)
+            if (a.page == pageIdx) drawNormRects(canvas, pageDst, crop, a.rects, a.color, dot = a.note.isNotBlank(), style = a.style, night = night)
         }
         for (s in inks) {
-            if (s.page == pageIdx) drawInk(canvas, pageDst, crop, s.color, s.width, s.points)
+            if (s.page == pageIdx) drawInk(canvas, pageDst, crop, s.color, s.width, s.points, night = night)
         }
         for (sh in shapes) {
             if (sh.page == pageIdx) drawShape(canvas, pageDst, crop, sh.kind, sh.x1, sh.y1, sh.x2, sh.y2, sh.color, sh.width, sh.text)

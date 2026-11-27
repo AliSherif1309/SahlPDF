@@ -51,6 +51,8 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private lateinit var pagePill: TextView
     private lateinit var selectionBar: LinearLayout
     private lateinit var seek: SeekBar
+    private lateinit var navBackBtn: TextView
+    private lateinit var navFwdBtn: TextView
     private lateinit var progress: ProgressBar
 
     private var doc: PdfDoc? = null
@@ -61,6 +63,9 @@ class ReaderActivity : Activity(), PdfView.Listener {
     private var docPassword: String? = null
     private var embeddedAnnotations: List<EmbeddedAnnotation> = emptyList()
     private var pendingEmbeddedEdit: ((java.io.OutputStream) -> Boolean)? = null
+    private val backStack = ArrayDeque<Int>()
+    private val forwardStack = ArrayDeque<Int>()
+    private var seekStartPage = -1
     private var barsShown = true
     private var searchOpen = false
     private var searchGen = 0
@@ -226,29 +231,66 @@ class ReaderActivity : Activity(), PdfView.Listener {
         topContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> syncChromeInsets() }
 
         bottomBar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(barColor)
+            setPadding(dp(12), dp(4), dp(12), dp(6))
+        }
+        val seekRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(barColor)
-            setPadding(dp(16), dp(6), dp(8), dp(6))
         }
         pageLabel = TextView(this).apply {
-            setTextColor(Color.WHITE); textSize = 14f
-            minWidth = dp(72)
+            setTextColor(Color.WHITE); textSize = 13.5f; typeface = Typeface.DEFAULT_BOLD
+            minWidth = dp(92)
             Ui.focusable(this, Color.TRANSPARENT, dp(12).toFloat(), Color.parseColor("#F5C84C"))
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setPadding(dp(6), dp(6), dp(6), dp(6))
             setOnClickListener { askPage() }
         }
-        bottomBar.addView(pageLabel)
+        seekRow.addView(pageLabel)
         seek = SeekBar(this).apply {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
                     if (fromUser) { pdfView.goTo(p); updateLabel(p) }
                 }
-                override fun onStartTrackingTouch(s: SeekBar) {}
-                override fun onStopTrackingTouch(s: SeekBar) {}
+                override fun onStartTrackingTouch(s: SeekBar) { seekStartPage = pdfView.page }
+                override fun onStopTrackingTouch(s: SeekBar) {
+                    val from = seekStartPage
+                    seekStartPage = -1
+                    if (from >= 0 && from != pdfView.page) {
+                        recordJumpFrom(from)
+                    }
+                }
             })
         }
-        bottomBar.addView(seek, LinearLayout.LayoutParams(0, dp(40), 1f))
+        seekRow.addView(seek, LinearLayout.LayoutParams(0, dp(36), 1f))
+        bottomBar.addView(seekRow)
+
+        val navRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), 0, dp(2), 0)
+        }
+        fun navBtn(symbol: String, descRes: Int, click: () -> Unit) = TextView(this).apply {
+            text = symbol
+            contentDescription = getString(descRes)
+            setTextColor(Color.WHITE); textSize = 18f; typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            Ui.focusable(this, Color.parseColor("#1FFFFFFF"), dp(14).toFloat(), Color.parseColor("#F5C84C"))
+            setPadding(dp(14), dp(4), dp(14), dp(4))
+            setOnClickListener { click() }
+        }
+        navBackBtn = navBtn("↩", R.string.jump_back) { jumpHistoryBack() }
+        navFwdBtn = navBtn("↪", R.string.jump_forward) { jumpHistoryForward() }
+        navRow.addView(navBackBtn, LinearLayout.LayoutParams(-2, dp(34)).apply { marginEnd = dp(8) })
+        navRow.addView(navFwdBtn, LinearLayout.LayoutParams(-2, dp(34)))
+        navRow.addView(View(this), LinearLayout.LayoutParams(0, 0, 1f))
+        navRow.addView(navBtn("‹", R.string.prev_page) { stepOnePage(-1) },
+            LinearLayout.LayoutParams(-2, dp(34)).apply { marginEnd = dp(8) })
+        navRow.addView(navBtn("›", R.string.next_page) { stepOnePage(1) },
+            LinearLayout.LayoutParams(-2, dp(34)))
+        bottomBar.addView(navRow)
+        updateNavButtons()
+
         root.addView(bottomBar, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         bottomBar.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> syncChromeInsets() }
 
@@ -263,11 +305,11 @@ class ReaderActivity : Activity(), PdfView.Listener {
         })
 
         val highlightColors = intArrayOf(
-            0x66F5C84C,          // Gold
-            0x552E9E6B,          // Emerald
-            0x553B9DF2,          // Sky blue
-            0x55E85D75,          // Rose
-            0x559B72CF,          // Lavender
+            0xFFFFF04D.toInt(),  // Vivid Yellow (Xodo-clear)
+            0xFF5CE6FF.toInt(),  // Bright Cyan
+            0xFF7BFF6B.toInt(),  // Bright Green
+            0xFFFF85B3.toInt(),  // Bright Pink
+            0xFFFFBE55.toInt(),  // Vivid Orange
         )
         var activeColor = highlightColors[0]
         val colorDots = ArrayList<View>()
@@ -401,9 +443,64 @@ class ReaderActivity : Activity(), PdfView.Listener {
 
     private fun updateLabel(p: Int) {
         val n = pdfView.pageCount
-        pageLabel.text = getString(R.string.page_short, p + 1, n)
-        pagePill.text = getString(R.string.page_short, p + 1, n)
+        val pct = if (n > 0) ((p + 1) * 100 / n).coerceIn(0, 100) else 0
+        val txt = "${getString(R.string.page_short, p + 1, n)} · $pct%"
+        pageLabel.text = txt
+        pagePill.text = txt
         updateBookmarkIcon(p)
+    }
+
+    private fun recordJumpFrom(fromPage: Int) {
+        if (backStack.lastOrNull() != fromPage) {
+            backStack.addLast(fromPage)
+            while (backStack.size > 50) backStack.removeFirst()
+        }
+        forwardStack.clear()
+        updateNavButtons()
+    }
+
+    private fun jumpToPage(target: Int) {
+        val n = pdfView.pageCount
+        if (n <= 0) return
+        val p = target.coerceIn(0, n - 1)
+        val cur = pdfView.page
+        if (p != cur) recordJumpFrom(cur)
+        pdfView.goTo(p)
+        updateLabel(p)
+    }
+
+    private fun jumpHistoryBack() {
+        if (backStack.isEmpty()) return
+        val cur = pdfView.page
+        val target = backStack.removeLast()
+        if (forwardStack.lastOrNull() != cur) forwardStack.addLast(cur)
+        pdfView.goTo(target)
+        updateLabel(target)
+        updateNavButtons()
+    }
+
+    private fun jumpHistoryForward() {
+        if (forwardStack.isEmpty()) return
+        val cur = pdfView.page
+        val target = forwardStack.removeLast()
+        if (backStack.lastOrNull() != cur) backStack.addLast(cur)
+        pdfView.goTo(target)
+        updateLabel(target)
+        updateNavButtons()
+    }
+
+    private fun stepOnePage(dir: Int) {
+        val next = pdfView.stepPage(dir = dir)
+        pdfView.goTo(next)
+        updateLabel(next)
+    }
+
+    private fun updateNavButtons() {
+        if (!::navBackBtn.isInitialized) return
+        navBackBtn.alpha = if (backStack.isEmpty()) 0.3f else 1f
+        navBackBtn.isEnabled = backStack.isNotEmpty()
+        navFwdBtn.alpha = if (forwardStack.isEmpty()) 0.3f else 1f
+        navFwdBtn.isEnabled = forwardStack.isNotEmpty()
     }
 
     private fun updateBookmarkIcon(p: Int) {
@@ -588,7 +685,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
         val labels = list.map { getString(R.string.page_of, it.page + 1, pdfView.pageCount) }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(R.string.bookmarks)
-            .setItems(labels) { _, which -> pdfView.goTo(list[which].page); updateLabel(list[which].page) }
+            .setItems(labels) { _, which -> jumpToPage(list[which].page) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
@@ -608,7 +705,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
             val labels = items.map { "\u2003".repeat(it.depth) + it.title + "  ·  " + (it.page + 1) }.toTypedArray()
             AlertDialog.Builder(this)
                 .setTitle(R.string.contents)
-                .setItems(labels) { _, which -> pdfView.goTo(items[which].page); updateLabel(items[which].page) }
+                .setItems(labels) { _, which -> jumpToPage(items[which].page) }
                 .show()
         }
     }
@@ -626,7 +723,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
             .setView(box)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val p = input.text.toString().toIntOrNull() ?: return@setPositiveButton
-                pdfView.goTo((p - 1).coerceIn(0, n - 1))
+                jumpToPage((p - 1).coerceIn(0, n - 1))
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -1081,8 +1178,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
             .setTitle(R.string.notes_title)
             .setItems(items.map { it.label }.toTypedArray()) { _, which ->
                 val item = items[which]
-                pdfView.goTo(item.page)
-                updateLabel(item.page)
+                jumpToPage(item.page)
                 item.embedded?.let { onEmbeddedAnnotationTap(it) }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -1275,8 +1371,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
 
     override fun onLinkTap(link: PageLink) {
         if (link.destPage != null) {
-            pdfView.goTo(link.destPage)
-            updateLabel(link.destPage)
+            jumpToPage(link.destPage)
         } else if (link.uri != null) {
             AlertDialog.Builder(this)
                 .setTitle(R.string.open_link)
@@ -1291,59 +1386,153 @@ class ReaderActivity : Activity(), PdfView.Listener {
         selectionBar.visibility = if (selection != null) View.VISIBLE else View.GONE
     }
 
+    override fun onHighlightDragged(page: Int, text: String, rects: List<NormRect>) {
+        val entry = Library.addAnnotation(this, key, page, rects, text, "", pdfView.penColor, "highlight")
+        pdfView.setAnnotations(Library.annotations(this, key))
+        onAnnotationTap(entry)
+    }
+
     override fun onAnnotationTap(entry: Library.AnnotationEntry) {
         val pal = Palette(this)
         val dlg = android.app.Dialog(this)
         dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        var current = entry
+
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = Ui.rounded(pal.bg, dp(22).toFloat(), dp(1), pal.divider)
-            setPadding(dp(20), dp(18), dp(20), dp(14))
+            setPadding(dp(18), dp(16), dp(18), dp(14))
         }
         card.addView(TextView(this).apply {
             text = getString(R.string.page_of, entry.page + 1, pdfView.pageCount)
-            textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(pal.text)
-            setPadding(0, 0, 0, dp(10))
+            textSize = 15.5f; typeface = Typeface.DEFAULT_BOLD; setTextColor(pal.gold)
+            setPadding(0, 0, 0, dp(8))
         })
-        card.addView(TextView(this).apply {
-            text = entry.text
-            textSize = 13.5f; setTextColor(pal.sub)
-            background = Ui.rounded(pal.card, dp(14).toFloat())
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        if (entry.text.isNotBlank()) {
+            card.addView(TextView(this).apply {
+                text = entry.text
+                textSize = 13.5f; setTextColor(pal.sub)
+                maxLines = 3; ellipsize = android.text.TextUtils.TruncateAt.END
+                background = Ui.rounded(pal.card, dp(12).toFloat())
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+        }
         if (entry.note.isNotBlank()) {
             card.addView(TextView(this).apply {
                 text = NoteFormat.decode(entry.note)
                 textSize = 15f; setTextColor(pal.text)
-                setPadding(dp(4), dp(2), dp(4), dp(12))
+                setPadding(dp(4), dp(2), dp(4), dp(10))
             })
         }
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
-        fun btn(label: Int, color: Int, click: () -> Unit) = TextView(this).apply {
-            text = getString(label); setTextColor(color); textSize = 14f; typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(12), dp(8), dp(12), dp(8)); setOnClickListener { click() }
+
+        // Row 1: Xodo-style vivid color palette
+        val paletteColors = intArrayOf(
+            0xFFFFF04D.toInt(), // Yellow
+            0xFF5CE6FF.toInt(), // Cyan
+            0xFF7BFF6B.toInt(), // Green
+            0xFFFF85B3.toInt(), // Pink
+            0xFFFFBE55.toInt(), // Orange
+        )
+        val dotViews = ArrayList<View>()
+        val colorRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(2), 0, dp(10))
         }
-        row.addView(btn(R.string.delete, Color.parseColor("#E05A47")) {
-            Library.removeAnnotation(this, key, entry.id)
+        fun refreshPalette() {
+            for (i in dotViews.indices) {
+                val c = paletteColors[i]
+                val sel = (current.color or 0xFF000000.toInt()) == c
+                dotViews[i].background = Ui.rounded(c, dp(14).toFloat(), if (sel) dp(2) else dp(1), if (sel) pal.text else pal.divider)
+            }
+        }
+        for (c in paletteColors) {
+            val dot = View(this).apply {
+                setOnClickListener {
+                    current = current.copy(color = c)
+                    pdfView.setAnnotations(Library.updateAnnotationColor(this@ReaderActivity, key, current.id, c))
+                    refreshPalette()
+                }
+            }
+            dotViews += dot
+            colorRow.addView(dot, LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(10) })
+        }
+        refreshPalette()
+        card.addView(colorRow)
+
+        // Row 2: Style switcher (Highlight / Underline / Strike / Squiggly) for non-sticky markups
+        if (entry.style != "sticky") {
+            val styles = listOf(
+                "highlight" to R.string.highlight,
+                "underline" to R.string.underline,
+                "strikeout" to R.string.strikeout,
+                "squiggly" to R.string.squiggly,
+            )
+            val styleViews = LinkedHashMap<String, TextView>()
+            fun refreshStyles() {
+                for ((st, tv) in styleViews) {
+                    val on = current.style == st
+                    Ui.focusable(tv, if (on) pal.accent else pal.card, dp(12).toFloat(), pal.gold)
+                    tv.setTextColor(if (on) Color.WHITE else pal.text)
+                }
+            }
+            val styleRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 0, 0, dp(12))
+            }
+            for ((st, res) in styles) {
+                val tv = TextView(this).apply {
+                    text = getString(res)
+                    textSize = 12.5f; typeface = Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    setPadding(dp(8), dp(7), dp(8), dp(7))
+                    setOnClickListener {
+                        current = current.copy(style = st)
+                        pdfView.setAnnotations(Library.updateAnnotationStyle(this@ReaderActivity, key, current.id, st))
+                        refreshStyles()
+                    }
+                }
+                styleViews[st] = tv
+                styleRow.addView(tv, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(4) })
+            }
+            refreshStyles()
+            card.addView(styleRow)
+        }
+
+        // Row 3: Quick actions (Note, Copy, Delete, OK)
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
+        fun btn(label: Int, bg: Int, fg: Int, click: () -> Unit) = TextView(this).apply {
+            text = getString(label); setTextColor(fg); textSize = 13.5f; typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            Ui.focusable(this, bg, dp(14).toFloat(), pal.gold)
+            setOnClickListener { click() }
+        }
+        row.addView(btn(R.string.delete, Color.parseColor("#B83B3B"), Color.WHITE) {
+            Library.removeAnnotation(this, key, current.id)
             pdfView.setAnnotations(Library.annotations(this, key))
             dlg.dismiss()
-        })
-        row.addView(btn(R.string.copy, pal.sub) { copyText(entry.text); dlg.dismiss() })
-        row.addView(btn(R.string.edit_note, pal.accent) {
+        }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        if (entry.text.isNotBlank()) {
+            row.addView(btn(R.string.copy, pal.card, pal.text) { copyText(entry.text); dlg.dismiss() },
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        }
+        row.addView(btn(R.string.edit_note, pal.card, pal.text) {
             dlg.dismiss()
-            showNoteEditor(R.string.edit_note, entry.text, entry.note) { updated ->
-                Library.updateAnnotationNote(this, key, entry.id, updated)
+            showNoteEditor(R.string.edit_note, current.text, current.note) { updated ->
+                Library.updateAnnotationNote(this, key, current.id, updated)
                 pdfView.setAnnotations(Library.annotations(this, key))
             }
-        })
+        }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) })
+        row.addView(btn(android.R.string.ok, pal.accent, Color.WHITE) { dlg.dismiss() })
         card.addView(row)
+
         dlg.setContentView(card)
         dlg.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dlg.window?.setLayout((resources.displayMetrics.widthPixels * 0.92f).toInt(), -2)
         dlg.show()
     }
 
-    // ---- Xodo-style annotate bar (Pen, Marker, Eraser, Sticky note, Undo, Colors) ------
+    // ---- Xodo-style annotate bar (Highlight, Pen, Marker, Shapes, Text, Sticky, Eraser, Colors)
 
     private fun buildAnnotateBar(): LinearLayout {
         val bar = LinearLayout(this).apply {
@@ -1358,12 +1547,14 @@ class ReaderActivity : Activity(), PdfView.Listener {
         }
 
         val penColors = intArrayOf(
-            0xFF0E6B4E.toInt(), // Sahl Emerald
-            0xFFF5C84C.toInt(), // Sahl Gold
-            0xFF2196F3.toInt(), // Blue
+            0xFFFFF04D.toInt(), // Vivid Yellow
+            0xFF5CE6FF.toInt(), // Bright Cyan
+            0xFF7BFF6B.toInt(), // Bright Green
+            0xFFFF85B3.toInt(), // Bright Pink
             0xFFE53935.toInt(), // Red
             0xFF111C18.toInt(), // Ink Black
         )
+        pdfView.penColor = penColors[0]
         val colorDots = ArrayList<View>()
         val toolBtns = LinkedHashMap<PdfView.ToolMode, TextView>()
 
@@ -1387,14 +1578,17 @@ class ReaderActivity : Activity(), PdfView.Listener {
             setOnClickListener {
                 pdfView.toolMode = if (pdfView.toolMode == mode) PdfView.ToolMode.NONE else mode
                 refreshAnnotateUi()
-                if (pdfView.toolMode == PdfView.ToolMode.STICKY) {
-                    Toast.makeText(this@ReaderActivity, R.string.tap_to_place_note, Toast.LENGTH_SHORT).show()
+                when (pdfView.toolMode) {
+                    PdfView.ToolMode.STICKY -> Toast.makeText(this@ReaderActivity, R.string.tap_to_place_note, Toast.LENGTH_SHORT).show()
+                    PdfView.ToolMode.HIGHLIGHT -> Toast.makeText(this@ReaderActivity, R.string.drag_to_highlight, Toast.LENGTH_SHORT).show()
+                    else -> Unit
                 }
             }
             toolBtns[mode] = this
         }
 
         val lp = { LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(6) } }
+        toolsRow.addView(toolBtn(PdfView.ToolMode.HIGHLIGHT, R.string.highlight), lp())
         toolsRow.addView(toolBtn(PdfView.ToolMode.PEN, R.string.pen), lp())
         toolsRow.addView(toolBtn(PdfView.ToolMode.MARKER, R.string.marker), lp())
         toolsRow.addView(toolBtn(PdfView.ToolMode.RECT, R.string.shape_rect), lp())
@@ -1417,7 +1611,7 @@ class ReaderActivity : Activity(), PdfView.Listener {
                 setOnClickListener {
                     pdfView.penColor = c
                     if (pdfView.toolMode == PdfView.ToolMode.NONE || pdfView.toolMode == PdfView.ToolMode.ERASER) {
-                        pdfView.toolMode = PdfView.ToolMode.PEN
+                        pdfView.toolMode = PdfView.ToolMode.HIGHLIGHT
                     }
                     refreshAnnotateUi()
                 }

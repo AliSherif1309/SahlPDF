@@ -141,4 +141,9 @@
     <string name="capture_photo">Capture</string>
     <string name="camera_permission_needed">Camera permission is needed to scan documents</string>
     <string name="note">Note</string>
+    <string name="jump_back">Previous location</string>
+    <string name="jump_forward">Next location</string>
+    <string name="prev_page">Previous page</string>
+    <string name="next_page">Next page</string>
+    <string name="drag_to_highlight">Drag across text to highlight</string>
 </resources>

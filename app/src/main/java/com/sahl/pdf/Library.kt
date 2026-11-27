@@ -224,6 +224,18 @@ object Library {
         saveAnnotations(c, docKey, annotations(c, docKey).map { if (it.id == id) it.copy(note = note) else it })
     }
 
+    fun updateAnnotationColor(c: Context, docKey: String, id: String, color: Int): List<AnnotationEntry> {
+        val next = annotations(c, docKey).map { if (it.id == id) it.copy(color = color) else it }
+        saveAnnotations(c, docKey, next)
+        return next
+    }
+
+    fun updateAnnotationStyle(c: Context, docKey: String, id: String, style: String): List<AnnotationEntry> {
+        val next = annotations(c, docKey).map { if (it.id == id) it.copy(style = style) else it }
+        saveAnnotations(c, docKey, next)
+        return next
+    }
+
     fun moveAnnotation(c: Context, docKey: String, id: String, rects: List<NormRect>): List<AnnotationEntry> {
         val next = annotations(c, docKey).map { if (it.id == id) it.copy(rects = rects) else it }
         saveAnnotations(c, docKey, next)
