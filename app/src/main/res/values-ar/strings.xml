@@ -140,4 +140,5 @@
     <string name="exported_count">تم حفظ %1$d ملفات</string>
     <string name="capture_photo">التقاط</string>
     <string name="camera_permission_needed">يلزم إذن الكاميرا لمسح المستندات ضوئياً</string>
+    <string name="note">ملاحظة</string>
 </resources>
